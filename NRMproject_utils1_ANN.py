@@ -28,6 +28,10 @@ class Dataset01(Dataset):
 		'''
 		self.all_data = all_data
 		self.labels = all_data[:,4].copy()
+		trainIndex = self.all_data[:,0] != (1990 + cross_validation_index)
+		series = self.all_data[trainIndex,4].copy()
+		self.flowMA = np.array([annualMovingAverage(series=series, semiwindow=6) for i in range(20)]).flatten()
+		self.flowMSTD = np.array([np.sqrt(annualMovingVariance(series=series, semiwindow=6)) for i in range(20)]).flatten()
 		# Other necessary stuff
 		''' model_type: save input type as indexes.
 			Allowed:
@@ -79,6 +83,7 @@ class Dataset01(Dataset):
 		if (cross_validation_index < 0) or (cross_validation_index >19):
 			print("Error: cross_validation_index out ob bounds."); quit()
 		self.cv_idx = cross_validation_index
+		self.doy = np.array([range(1,365+1,1) for i in range(20)]).reshape((365*20, 1))
 		''' index representing the number of past time instants needed.
 			It is also the index from which we start getting the observations (lables),
 			in other words the global index at which (t+1) starts for the first time.
@@ -96,12 +101,7 @@ class Dataset01(Dataset):
 			'''
 			''' Flow '''
 			trainIndex = self.all_data[:,0] != (1990 + self.cv_idx)
-			series = self.all_data[trainIndex,4].copy()
-			ma = annualMovingAverage(series=series, semiwindow=6)
-			ma = np.array([ma for i in range(20)]).flatten()
-			mstd = np.sqrt(annualMovingVariance(series=series, semiwindow=6))
-			mstd = np.array([mstd for i in range(20)]).flatten()
-			self.all_data[:,4] =  (self.all_data[:,4].copy() - ma) / mstd
+			self.all_data[:,4] =  (self.all_data[:,4].copy() - self.flowMA) / self.flowMSTD
 			''' Rain '''
 			series = self.all_data[trainIndex,3].copy()
 			ma = annualMovingAverage(series=series, semiwindow=6)
@@ -183,26 +183,21 @@ class Dataset01(Dataset):
 			The day is meant as the day we want to predict (t+1, not t)
 		'''
 		if self.inlude_day_of_year:
-			doy = np.array([range(1,365+1,1) for i in range(20)]).reshape((365*20, 1))[select_idx]
-			input_data = np.append(input_data, doy[self.n_past + index] )
+			input_data = np.append(input_data, self.doy[self.n_past + index] )
 		''' Put input data into tensor '''
 		input_data = torch.tensor(input_data.copy(), dtype=torch.float32)
 		# Label (flow at time t+1)
 		series = self.labels[select_idx]
 		label = series[self.n_past + index]
 		label = torch.tensor(label, dtype=torch.float32)
+		stdlabel = ( series[self.n_past + index] - self.flowMA[self.n_past + index]) / self.flowMSTD[self.n_past + index]
+		stdlabel = torch.tensor(stdlabel, dtype=torch.float32)
+		# Day of the year of the label, estimated MA and MSTD from the training set
+		doy_out  = torch.tensor(self.doy[self.n_past + index],  dtype=torch.float32)
+		ma_out   = torch.tensor(self.flowMA[self.n_past + index],  dtype=torch.float32)
+		mstd_out = torch.tensor(self.flowMSTD[self.n_past + index],  dtype=torch.float32)
 		# Return structured data (tensor, float)
-		return {"input": input_data, "label": label}
-
-	def setTrain(self, train):
-		''' True for training, False for validation'''
-		self.train=train
-	def setCrossValIdx(self, idx):
-		if (idx >= 0) and (idx<20):
-			self.cv_idx = idx
-		else:
-			print("Cross validation index out of bounds: ", idx)
-			quit()
+		return {"input": input_data, "label": label, "stdlabel": stdlabel, "doy": doy_out, "ma": ma_out, "mstd": mstd_out}
 
 	def printDatasetInfo(self):
 		print("Dataset created." )
@@ -219,24 +214,25 @@ class ANN(nn.Module):
 			quit()
 		print("Created NN with input size ", input_size)
 		# Input-dependent parameters
-		size_o1 = int(input_size+1)
+		size_o1 = int(input_size*2.2)
 		# Layers
-		self.stacked_layers = nn.Sequential(
+		self.shallow = nn.Sequential(
 			nn.Linear(input_size, size_o1, bias=True),
-			nn.LazyBatchNorm1d(),
-			nn.Sigmoid(),
+			nn.LogSigmoid(),#nn.Tanh(), #nn.Sigmoid(),
 			nn.Linear(size_o1, 1, bias=True)
 		)
-		self.stacked_layers1 = nn.Sequential(
+		self.deep = nn.Sequential(
 			nn.Linear(input_size, size_o1, bias=True),
+			nn.LogSigmoid(),
+			nn.Linear(size_o1, int(1.5*input_size)+1, bias=True),
+			nn.Tanh(),
+			nn.Linear(int(1.5*input_size)+1, input_size+3, bias=True),
 			nn.Sigmoid(),
-			nn.Linear(size_o1, 5, bias=True),
-			nn.Sigmoid(),
-			nn.Linear(5, 1, bias=True)
+			nn.Linear(input_size+3, 1, bias=True)
 		)
 		
 	def forward(self, input_t):
-		out = self.stacked_layers1(input_t)
+		out = self.deep(input_t)
 		return out.flatten()
 
 
@@ -249,15 +245,15 @@ class ANN(nn.Module):
 
 # Training and validation ANN loops
 
-def train_loop(dataloader, model, loss_fn, optimizer, verbose= True):
+def train_loop(dataloader, model, device, loss_fn, optimizer, verbose= True):
 	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	train_loss = 0
 	print("Training...")
 	for batch_idx, sample_batched in enumerate(dataloader):
 		# Compute prediction and loss
-		X = sample_batched["input"]
-		Y = sample_batched["label"]
+		X = sample_batched["input"].to(device)
+		Y = sample_batched["stdlabel"].to(device)
 		Y_ = model(X)
 		loss = loss_fn(Y_, Y)
 		train_loss += loss.item()
@@ -267,7 +263,7 @@ def train_loop(dataloader, model, loss_fn, optimizer, verbose= True):
 		optimizer.step()
 		# Print output
 		if verbose: 
-			print(f"{(batch_idx / num_batches)*100:>2f}% completed. ", end = "")
+			print(f"{(batch_idx / num_batches)*100:.0f}% completed. ", end = "")
 			if batch_idx != num_batches-1:
 				print("", end = "\r")
 	train_loss /= num_batches
@@ -275,16 +271,16 @@ def train_loop(dataloader, model, loss_fn, optimizer, verbose= True):
 	return train_loss
 
 
-def valid_loop(dataloader, model, loss_fn, verbose= True):
+def valid_loop(dataloader, model, device, loss_fn, verbose= True):
 	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	test_loss = 0
 	if verbose: print("Validating...")
 	with torch.no_grad():
 		for sample_batched in dataloader:
-			X = sample_batched["input"]
-			Y = sample_batched["label"]
-			Y_ = model(X).flatten()
+			X = sample_batched["input"].to(device)
+			Y = sample_batched["label"].to(device)
+			Y_ = model(X) *sample_batched["mstd"] + sample_batched["ma"]
 			test_loss += loss_fn(Y_, Y).item()
 	test_loss /= num_batches
 	if verbose: print(f"Avg loss over batches: {test_loss:>8f}")

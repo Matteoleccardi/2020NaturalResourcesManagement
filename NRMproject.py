@@ -11,6 +11,7 @@ from NRMproject_utils1_ANN import *
 from NRMproject_plots import *
 
 DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
+DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
 
 data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
 year  = data[:,0]
@@ -501,11 +502,11 @@ if PART_11:
 		Transform data - put data into tensor form
 		Load data - put data into an object to make it easily accessible
 	'''
-	if 0: # Single train/validation cycle
+	if 1: # Single train/validation cycle
 		model_type = "F_"
 		model_order = [4]
 		include_day = False
-		cv_idx = 0
+		cv_idx = 7
 		preproc = 1
 		train_dataset = Dataset01(data.copy(),  train=True,
 						                        model_type=model_type,
@@ -519,7 +520,7 @@ if PART_11:
 						                        inlude_day_of_year=include_day,
 						                        cross_validation_index=cv_idx,
 						                        preprocessing=preproc )
-		batch_size = 30 # 73 # 5 batrches / year
+		batch_size = 73 # 5 batrches / year
 		train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
 						                             shuffle=True,
 						                             num_workers=0 )
@@ -529,11 +530,13 @@ if PART_11:
 		
 		# Build model
 		n_input = len(train_dataset[0]["input"])
-		net = ANN(n_input)
+		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+		if torch.cuda.is_available(): torch.cuda.empty_cache()
+		net = ANN(n_input).to(device)
 
 		# Train model
-		learning_rate = 1.1e-3
-		gamma = 0.95 # i think the closer to one, the slower the decay
+		learning_rate = 8.1e-3
+		gamma = 0.96 # i think the closer to one, the slower the decay
 		loss_fn = nn.MSELoss()
 		optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
 		scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=True)
@@ -547,9 +550,9 @@ if PART_11:
 
 		for t in range(epochs):
 			print(f"\nEpoch {t+1}\n-------------------------------")
-			tl = train_loop(train_dataloader, net, loss_fn, optimizer)
+			tl = train_loop(train_dataloader, net, device, loss_fn, optimizer)
 			train_loss.append(np.sqrt(tl))
-			vl = valid_loop(valid_dataloader, net, loss_fn)
+			vl = valid_loop(valid_dataloader, net, device, loss_fn)
 			valid_loss.append(np.sqrt(vl))
 			# Learning rate
 			scheduler.step()
@@ -568,13 +571,16 @@ if PART_11:
 	
 
 
-	if 1: # ITERATION ALONG A MODEL ORDER
+	if 0: # ITERATION ALONG A MODEL ORDER
+		''' '''
+		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+		if torch.cuda.is_available(): torch.cuda.empty_cache()
 		''' '''
 		batch_size = 73 # 5 batches / year
 		include_day = False
 		preproc = 1
-		learning_rate = 1.1e-3
-		gamma = 0.95
+		learning_rate = 5.0e-3
+		gamma = 0.96
 		epochs = 100
 		''' '''
 		model_type = "F_"
@@ -618,7 +624,7 @@ if PART_11:
 															 shuffle=True,
 															 num_workers=0 )
 				n_input = len(train_dataset[0]["input"])
-				net = ANN(n_input)
+				net = ANN(n_input).to(device)
 				loss_fn = nn.MSELoss()
 				optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
 				scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=True)
