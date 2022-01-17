@@ -598,25 +598,22 @@ if PART_11:
 		for order in orders_to_test:
 			model_order = order
 			print("\n\n\n### Testing model type "+model_type+" with order: ", model_order)
-			cv_idx = 0
-			train_dataset = Dataset01(data.copy(),  train=True,
-						                        model_type=model_type,
-						                        model_order=model_order,
-						                        inlude_day_of_year=include_day,
-						                        cross_validation_index=cv_idx,
-						                        preprocessing=preproc )
-			valid_dataset = Dataset01(data.copy(),  train=False,
-						                        model_type=model_type,
-						                        model_order=model_order,
-						                        inlude_day_of_year=include_day,
-						                        cross_validation_index=cv_idx,
-						                        preprocessing=preproc )
 			cv_valid_loss = []
 			''' cross validation loop: meant to find the best model, not the best network params '''
 			for cv_id in range(20):
-				print("\n\n Cross validating (CV) index: ", cv_idx)
-				train_dataset.setCrossValIdx(cv_id)
-				valid_dataset.setCrossValIdx(cv_id)
+				print("\n\n Cross validating (CV) index: ", cv_id)
+				train_dataset = Dataset01(data.copy(),  train=True,
+								                        model_type=model_type,
+								                        model_order=model_order,
+								                        inlude_day_of_year=include_day,
+								                        cross_validation_index=cv_id,
+								                        preprocessing=preproc )
+				valid_dataset = Dataset01(data.copy(),  train=False,
+								                        model_type=model_type,
+								                        model_order=model_order,
+								                        inlude_day_of_year=include_day,
+								                        cross_validation_index=cv_id,
+								                        preprocessing=preproc )
 				train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
 															 shuffle=True,
 															 num_workers=0 )
@@ -631,9 +628,9 @@ if PART_11:
 				train_loss = []
 				valid_loss = []
 				for t in range(epochs):
-					print(f"\nCV {1990+cv_idx}, Epoch {t+1}\n-------------------------------", end="\r")
-					tl = train_loop(train_dataloader, net, loss_fn, optimizer, verbose=False)
-					vl = valid_loop(valid_dataloader, net, loss_fn, verbose=False)
+					print(f"\nCV {1990+cv_id}, Epoch {t+1}\n-------------------------------", end="\r")
+					tl = train_loop(train_dataloader, net, device, loss_fn, optimizer, verbose=False)
+					vl = valid_loop(valid_dataloader, net, device, loss_fn, verbose=False)
 					# Learning rate
 					scheduler.step()
 					# Save data (epoch)
