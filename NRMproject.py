@@ -579,9 +579,9 @@ if PART_11:
 		batch_size = 73 # 5 batches / year
 		include_day = False
 		preproc = 1
-		learning_rate = 5.0e-3
+		learning_rate = 8.0e-3
 		gamma = 0.96
-		epochs = 100
+		epochs = 120
 		''' '''
 		model_type = "F_"
 		i_rain = False

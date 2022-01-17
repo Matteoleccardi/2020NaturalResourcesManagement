@@ -280,7 +280,7 @@ def valid_loop(dataloader, model, device, loss_fn, verbose= True):
 		for sample_batched in dataloader:
 			X = sample_batched["input"].to(device)
 			Y = sample_batched["label"].to(device)
-			Y_ = model(X) *sample_batched["mstd"] + sample_batched["ma"]
+			Y_ = model(X) *sample_batched["mstd"].to(device) + sample_batched["ma"].to(device)
 			test_loss += loss_fn(Y_, Y).item()
 	test_loss /= num_batches
 	if verbose: print(f"Avg loss over batches: {test_loss:>8f}")
