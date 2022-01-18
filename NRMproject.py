@@ -502,9 +502,21 @@ if PART_11:
 		Transform data - put data into tensor form
 		Load data - put data into an object to make it easily accessible
 	'''
-	if 1: # Single train/validation cycle
-		model_type = "F_"
-		model_order = [4]
+	if 0: # Single train/validation cycle
+		''' model_type: save input type as indexes.
+			Allowed:
+			0: ""
+			0: "F_"
+			1: "F_R_PRO"
+			2: "F_R_IMP"
+			3: "F_T_PRO"
+			4: "F_T_IMP"
+			5: "F_R_PRO_T_PRO"
+			6: "F_R_IMP_T_PRO"
+			7: "F_R_IMP_T_IMP"
+		'''
+		model_type = "F_R_IMP_T_PRO"
+		model_order = [4, 3, 15]
 		include_day = False
 		cv_idx = 7
 		preproc = 1
@@ -520,6 +532,8 @@ if PART_11:
 						                        inlude_day_of_year=include_day,
 						                        cross_validation_index=cv_idx,
 						                        preprocessing=preproc )
+		
+
 		batch_size = 73 # 5 batrches / year
 		train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
 						                             shuffle=True,
@@ -533,15 +547,17 @@ if PART_11:
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
 		net = ANN(n_input).to(device)
+		learning_rate = net.param_lr_gamma["deepNonlinear"][0]
+		gamma         = net.param_lr_gamma["deepNonlinear"][1] # the closer to one, the slower the decay
+		
+		#print(net.linear[0].weight, net.linear[0].bias)
 
 		# Train model
-		learning_rate = 8.1e-3
-		gamma = 0.96 # i think the closer to one, the slower the decay
 		loss_fn = nn.MSELoss()
 		optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
 		scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=True)
 		
-		epochs = 100
+		epochs = 300
 		train_loss = []
 		valid_loss = []
 		
@@ -562,7 +578,7 @@ if PART_11:
 			ax.grid()
 			ax.plot( x, np.array(train_loss), "r.-", label="Training")
 			ax.plot( x, np.array(valid_loss), "b.-", label="Validation")
-			plt.pause(0.1)
+			plt.pause(0.001)
 			plt.draw()
 		
 		print("\n\n#########\n#       #\n# Done! #\n#       #\n#########\n")
@@ -571,19 +587,19 @@ if PART_11:
 	
 
 
-	if 0: # ITERATION ALONG A MODEL ORDER
+	if 1: # ITERATION ALONG A MODEL ORDER
 		''' '''
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
 		''' '''
 		batch_size = 73 # 5 batches / year
-		include_day = False
 		preproc = 1
-		learning_rate = 8.0e-3
-		gamma = 0.96
-		epochs = 120
+		epochs = 100
+		learning_rate = ANN(1).param_lr_gamma["shallowLinear"][0]
+		gamma         = ANN(1).param_lr_gamma["shallowLinear"][1]
 		''' '''
 		model_type = "F_"
+		include_day = False
 		i_rain = False
 		i_temp = False
 		Fmax_, Rmax_, Tmax_ = 15, 0, 0
@@ -601,7 +617,7 @@ if PART_11:
 			cv_valid_loss = []
 			''' cross validation loop: meant to find the best model, not the best network params '''
 			for cv_id in range(20):
-				print("\n\n Cross validating (CV) index: ", cv_id)
+				print("Cross validating (CV) index: ", cv_id)
 				train_dataset = Dataset01(data.copy(),  train=True,
 								                        model_type=model_type,
 								                        model_order=model_order,
@@ -624,11 +640,11 @@ if PART_11:
 				net = ANN(n_input).to(device)
 				loss_fn = nn.MSELoss()
 				optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
-				scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=True)
+				scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=False)
 				train_loss = []
 				valid_loss = []
 				for t in range(epochs):
-					print(f"\nCV {1990+cv_id}, Epoch {t+1}\n-------------------------------", end="\r")
+					print(f"CV {1990+cv_id}, Epoch {t+1} ", end="\r")
 					tl = train_loop(train_dataloader, net, device, loss_fn, optimizer, verbose=False)
 					vl = valid_loop(valid_dataloader, net, device, loss_fn, verbose=False)
 					# Learning rate
@@ -640,9 +656,9 @@ if PART_11:
 					x = np.arange(1, t+1+1); axv.clear(); axv.grid()
 					axv.plot( x, np.array(train_loss), "r.-", label="Training")
 					axv.plot( x, np.array(valid_loss), "b.-", label="Validation")
-					axv.set_title(f"Epochs cycle for CV year: {1990+cv_id}"); axv.set_xlabel(f"Epochs")
+					axv.set_title(f"Epochs cycle for CV year: {1990+cv_id}| Model order: {order}"); axv.set_xlabel(f"Epochs")
 					axv.legend()
-					plt.pause(0.1)
+					plt.pause(0.001)
 					plt.draw()
 				print("")
 				# Save data (Cross validation)
@@ -655,11 +671,13 @@ if PART_11:
 			axcv.set_title(f"Model order cycle. Latest in graph: {model_order}"); axcv.set_xlabel(f"Model order")
 			plt.pause(0.1)
 			plt.draw()
-		
-		print("\n\n#########\n#       #\n# Done! #\n#       #\n#########\n")
 		plt.ioff()
 		plt.show()
-
+		# Print data:
+		print("\n\n#########\n#       #\n# Done! #\n#       #\n#########\n")
+		for i in range(len(order_cv_loss)):
+			print(orders_to_test[i], ": ", order_cv_loss[i])
+			
 
 
 
