@@ -54,6 +54,8 @@ class ANN(nn.Module):
 		self.deepLinear = nn.Sequential(
 			nn.Linear(input_size, s, bias=True),
 			nn.ReLU(),
+			nn.Linear(s, s, bias=True),
+			nn.ReLU(),
 			nn.Linear(s, s+2, bias=True),
 			nn.ReLU(),
 			nn.Linear(s+2, 1, bias=True),
@@ -67,16 +69,32 @@ class ANN(nn.Module):
 			nn.Tanh(),
 			nn.ELU(),
 			nn.Linear(input_size, s, bias=True),
-			nn.Mish(),
+			nn.Sigmoid(),
 			nn.ELU(),
-			#nn.Linear(s, min(5, input_size+3), bias=True),
 			nn.Linear(s, 1, bias=True)
 		)
-		self.param_lr_gamma["deepNonlinear"] = [50.0e-3, 0.96]
+		self.param_lr_gamma["deepNonlinear"] = [100.0e-3, 0.96]
 
+		# Very deep Nonlinear NN
+		s = int(input_size*1.2)+2
+		self.veryDeepNonlinear = nn.Sequential(
+			nn.Linear(input_size, input_size, bias=True),
+			nn.Tanh(),
+			nn.ReLU(),
+			nn.Linear(input_size, s, bias=True),
+			nn.Sigmoid(),
+			nn.Linear(s, s+5, bias=True),
+			nn.LeakyReLU(0.2),
+			nn.Linear(s+5, input_size, bias=True),
+			nn.Sigmoid(),
+			nn.Linear(input_size, input_size, bias=True),
+			nn.ELU(),
+			nn.Linear(input_size, 1, bias=True)
+		)
+		self.param_lr_gamma["veryDeepNonlinear"] = [100.0e-3, 0.96]
 	
 	def forward(self, input_t):
-		out = self.shallowLinear(input_t)
+		out = self.deepNonlinear(input_t)
 		return out.flatten()
 
 
@@ -93,7 +111,6 @@ class ANN(nn.Module):
 # Training and validation ANN loops
 
 def train_loop(dataloader, model, device, loss_fn, optimizer, verbose= True):
-	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	train_loss = 0
 	if verbose: print("Training...")
@@ -119,7 +136,6 @@ def train_loop(dataloader, model, device, loss_fn, optimizer, verbose= True):
 
 
 def valid_loop(dataloader, model, device, loss_fn, verbose= True):
-	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	test_loss = 0
 	if verbose: print("Validating...")

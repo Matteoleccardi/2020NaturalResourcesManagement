@@ -502,7 +502,7 @@ if PART_11:
 		Transform data - put data into tensor form
 		Load data - put data into an object to make it easily accessible
 	'''
-	if 0: # Single train/validation cycle
+	if 1: # Single train/validation cycle
 		''' model_type: save input type as indexes.
 			Allowed:
 			0: ""
@@ -515,8 +515,8 @@ if PART_11:
 			6: "F_R_IMP_T_PRO"
 			7: "F_R_IMP_T_IMP"
 		'''
-		model_type = "F_R_IMP_T_PRO"
-		model_order = [4, 3, 15]
+		model_type = "F_R_IMP_T_IMP"
+		model_order = [4, 3, 3]
 		include_day = False
 		cv_idx = 7
 		preproc = 1
@@ -532,8 +532,6 @@ if PART_11:
 						                        inlude_day_of_year=include_day,
 						                        cross_validation_index=cv_idx,
 						                        preprocessing=preproc )
-		
-
 		batch_size = 73 # 5 batrches / year
 		train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
 						                             shuffle=True,
@@ -557,7 +555,7 @@ if PART_11:
 		optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
 		scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=True)
 		
-		epochs = 300
+		epochs = 100
 		train_loss = []
 		valid_loss = []
 		
@@ -584,10 +582,29 @@ if PART_11:
 		print("\n\n#########\n#       #\n# Done! #\n#       #\n#########\n")
 		plt.ioff()
 		plt.show()
-	
+		
+		# Scatterplot of labels-predictions and timeseries prediction for validation
+		y_lab = []
+		y_est = []
+		net.to('cpu')
+		for i in range(len(valid_dataset[:]["label"][:])):
+			X = valid_dataset[i]["input"]
+			Y_ = net(X) *valid_dataset[i]["mstd"] + valid_dataset[i]["ma"] 
+			y_lab.append( valid_dataset[i]["label"].item() )
+			y_est.append( Y_.item() )
+		fig, [ax1, ax2] = plt.subplots(2)
+		ax1.plot(y_est, y_lab, '.', alpha=0.7)
+		ax1.plot([0, max(y_est)], [0, max(y_est)], 'r--', linewidth=0.6, alpha=0.9)
+		ax1.set_xlabel("Estimated flow m3/s")
+		ax1.set_ylabel("Measured flow m3/s")
+		ax2.plot(range(len(valid_dataset[:]["label"][:])), y_lab, 'r-', alpha=0.9)
+		ax2.plot(range(len(valid_dataset[:]["label"][:])), y_est, 'b--', linewidth=0.8, alpha=0.7)
+		ax2.set_xlabel("Days")
+		ax2.set_ylabel("Flow (red measured)")
+		plt.show()
 
 
-	if 1: # ITERATION ALONG A MODEL ORDER
+	if 0: # ITERATION ALONG A MODEL ORDER
 		''' '''
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
