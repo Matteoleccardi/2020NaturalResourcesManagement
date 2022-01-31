@@ -1,1 +1,1 @@
-# 2020NaturalresourcesManagement
+# 2020NaturalResourcesManagement
