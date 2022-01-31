@@ -516,10 +516,10 @@ if PART_11:
 			6: "F_R_IMP_T_PRO"
 			7: "F_R_IMP_T_IMP"
 		'''
-		model_type = "F_R_IMP_T_IMP"
+		model_type = "F_R_PRO_T_PRO"
 		model_order = [4, 3, 3]
 		include_day = False
-		cv_idx = 7
+		cv_idx = 17
 		preproc = 1
 		train_dataset = Dataset01(data.copy(),  train=True,
 						                        model_type=model_type,
@@ -546,8 +546,8 @@ if PART_11:
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
 		net = ANN(n_input).to(device)
-		learning_rate = net.param_lr_gamma["deepNonlinear"][0]
-		gamma         = net.param_lr_gamma["deepNonlinear"][1] # the closer to one, the slower the decay
+		learning_rate = net.param_lr_gamma["deepLinear"][0]
+		gamma         = net.param_lr_gamma["deepLinear"][1] # the closer to one, the slower the decay
 		
 		#print(net.linear[0].weight, net.linear[0].bias)
 
@@ -559,26 +559,31 @@ if PART_11:
 		epochs = 100
 		train_loss = []
 		valid_loss = []
+		valid_loss_H = []
 		
 		plt.ion()
-		fig, ax = plt.subplots()
+		fig, axv = plt.subplots()
 
 		for t in range(epochs):
 			print(f"\nEpoch {t+1}\n-------------------------------")
 			tl = train_loop(train_dataloader, net, device, loss_fn, optimizer)
 			train_loss.append(np.sqrt(tl))
-			vl = valid_loop(valid_dataloader, net, device, loss_fn)
+			vl, vl_H = valid_loop(valid_dataloader, net, device, loss_fn, verbose=False, high_flow_loss=True)
 			valid_loss.append(np.sqrt(vl))
+			valid_loss_H.append(np.sqrt(vl_H))
 			# Learning rate
 			scheduler.step()
-			# Plot
-			x = np.arange(1, t+1+1)
-			ax.clear()
-			ax.grid()
-			ax.plot( x, np.array(train_loss), "r.-", label="Training")
-			ax.plot( x, np.array(valid_loss), "b.-", label="Validation")
-			plt.pause(0.001)
-			plt.draw()
+			# Plot data
+			if (t % 10 == 0) or (t>=epochs-10):
+				x = np.arange(1, t+1+1); axv.clear(); axv.grid()
+				axv.plot( x, np.array(train_loss), "r.-", label="Training")
+				axv.plot( x, np.array(valid_loss), "b.-", label="Validation")
+				axv.plot( x, np.array(valid_loss_H), "b.--", linewidth=0.9, label="Validation high flow")
+				axv.set_title(f"Epochs cycle for CV year: {1990+cv_idx}| Model order: {model_order}")
+				axv.set_xlabel(f"Epochs")
+				axv.legend()
+				plt.pause(0.001)
+				plt.draw()
 		
 		print("\n\n#########\n#       #\n# Done! #\n#       #\n#########\n")
 		plt.ioff()
@@ -593,21 +598,28 @@ if PART_11:
 			Y_ = net(X) *valid_dataset[i]["mstd"] + valid_dataset[i]["ma"] 
 			y_lab.append( valid_dataset[i]["label"].item() )
 			y_est.append( Y_.item() )
-		fig, [ax1, ax2] = plt.subplots(2)
+		fig, [ax1, ax2, ax3] = plt.subplots(3)
 		ax1.plot(y_est, y_lab, '.', alpha=0.7)
 		ax1.plot([0, max(y_est)], [0, max(y_est)], 'r--', linewidth=0.6, alpha=0.9)
 		ax1.set_xlabel("Estimated flow m3/s")
 		ax1.set_ylabel("Measured flow m3/s")
+		ax1.grid()
 		ax2.plot(range(len(valid_dataset[:]["label"][:])), y_lab, 'r-', alpha=0.9)
 		ax2.plot(range(len(valid_dataset[:]["label"][:])), y_est, 'b--', linewidth=0.8, alpha=0.7)
 		ax2.set_xlabel("Days")
 		ax2.set_ylabel("Flow (red measured)")
+		ax2.grid()
+		ax3.plot(y_lab, np.array(y_est) - np.array(y_lab), 'r.', alpha=0.9)
+		ax3.set_xlabel("Observed streamflow")
+		ax3.set_ylabel("Prediction error")
+		ax3.set_title("(Estimation - observation)")
+		ax3.grid()
 		plt.show()
 
 	
 
 
-	if 1: # ITERATION ALONG A MODEL ORDER
+	if 0: # ITERATION ALONG A MODEL ORDER
 		''' '''
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
