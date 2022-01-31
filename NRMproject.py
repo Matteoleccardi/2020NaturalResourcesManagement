@@ -502,6 +502,7 @@ if PART_11:
 		Transform data - put data into tensor form
 		Load data - put data into an object to make it easily accessible
 	'''
+	
 	if 1: # Single train/validation cycle
 		''' model_type: save input type as indexes.
 			Allowed:
@@ -603,26 +604,30 @@ if PART_11:
 		ax2.set_ylabel("Flow (red measured)")
 		plt.show()
 
+	
 
-	if 0: # ITERATION ALONG A MODEL ORDER
+
+	if 1: # ITERATION ALONG A MODEL ORDER
 		''' '''
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
 		''' '''
 		batch_size = 73 # 5 batches / year
 		preproc = 1
-		epochs = 100
-		learning_rate = ANN(1).param_lr_gamma["shallowLinear"][0]
-		gamma         = ANN(1).param_lr_gamma["shallowLinear"][1]
+		epochs = 120
+		learning_rate = ANN(1).param_lr_gamma["deepLinear"][0]
+		gamma         = ANN(1).param_lr_gamma["deepLinear"][1]
 		''' '''
-		model_type = "F_"
+		model_type = "F_R_PRO_T_PRO"
 		include_day = False
 		i_rain = False
 		i_temp = False
-		Fmax_, Rmax_, Tmax_ = 15, 0, 0
+		Fmax_, Rmax_, Tmax_ = 5, 5, 5
 		orders_to_test = get_modelOrdersToTest(Fmax_, Rmax_, i_rain, Tmax_, i_temp)
+		orders_to_test = [[4, 3, 3]]
 		''' '''
 		order_cv_loss = []
+		order_cv_loss_H = []
 		''' Plots for training cycle '''
 		plt.ion()
 		fig_v, axv = plt.subplots()
@@ -632,6 +637,7 @@ if PART_11:
 			model_order = order
 			print("\n\n\n### Testing model type "+model_type+" with order: ", model_order)
 			cv_valid_loss = []
+			cv_valid_loss_H = []
 			''' cross validation loop: meant to find the best model, not the best network params '''
 			for cv_id in range(20):
 				print("Cross validating (CV) index: ", cv_id)
@@ -651,49 +657,57 @@ if PART_11:
 															 shuffle=True,
 															 num_workers=0 )
 				valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size,
-															 shuffle=True,
+															 shuffle=False,
 															 num_workers=0 )
 				n_input = len(train_dataset[0]["input"])
 				net = ANN(n_input).to(device)
 				loss_fn = nn.MSELoss()
-				optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
+				optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.95)
 				scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=False)
 				train_loss = []
 				valid_loss = []
+				valid_loss_H = []
 				for t in range(epochs):
 					print(f"CV {1990+cv_id}, Epoch {t+1} ", end="\r")
 					tl = train_loop(train_dataloader, net, device, loss_fn, optimizer, verbose=False)
-					vl = valid_loop(valid_dataloader, net, device, loss_fn, verbose=False)
+					vl, vl_H = valid_loop(valid_dataloader, net, device, loss_fn, verbose=False, high_flow_loss=True)
 					# Learning rate
 					scheduler.step()
 					# Save data (epoch)
 					train_loss.append(np.sqrt(tl))
 					valid_loss.append(np.sqrt(vl))
+					valid_loss_H.append(np.sqrt(vl_H))
 					# Plot data
-					x = np.arange(1, t+1+1); axv.clear(); axv.grid()
-					axv.plot( x, np.array(train_loss), "r.-", label="Training")
-					axv.plot( x, np.array(valid_loss), "b.-", label="Validation")
-					axv.set_title(f"Epochs cycle for CV year: {1990+cv_id}| Model order: {order}"); axv.set_xlabel(f"Epochs")
-					axv.legend()
-					plt.pause(0.001)
-					plt.draw()
+					if (t == 20) or (t % 40 == 0) or (t==epochs-1):
+						x = np.arange(1, t+1+1); axv.clear(); axv.grid()
+						axv.plot( x, np.array(train_loss), "r.-", label="Training")
+						axv.plot( x, np.array(valid_loss), "b.-", label="Validation")
+						axv.plot( x, np.array(valid_loss_H), "b.--", linewidth=0.9, label="Validation high flow")
+						axv.set_title(f"Epochs cycle for CV year: {1990+cv_id}| Model order: {order}"); axv.set_xlabel(f"Epochs")
+						axv.legend()
+						plt.pause(0.01)
+						plt.draw()
 				print("")
 				# Save data (Cross validation)
-				cv_valid_loss.append(np.min(valid_loss))
+				cv_valid_loss.append(np.min(valid_loss[-30:]))
+				cv_valid_loss_H.append(np.min(valid_loss_H[-30:]))
 			# Save data about model (order) loss
 			order_cv_loss.append(np.median(cv_valid_loss))
+			order_cv_loss_H.append(np.median(cv_valid_loss_H))
 			# Plot data
 			x = np.arange(1, len(order_cv_loss)+1); axcv.clear(); axcv.grid()
-			axcv.plot( x, np.array(order_cv_loss), "r.-", label="Model losses")
-			axcv.set_title(f"Model order cycle. Latest in graph: {model_order}"); axcv.set_xlabel(f"Model order")
-			plt.pause(0.1)
+			axcv.plot( x, np.array(order_cv_loss), "r.-", label="All flows")
+			axcv.plot( x, np.array(order_cv_loss_H), "r.--", label="High flows only")
+			axcv.set_title("Model "+model_type+f" order cycle. Latest in graph: {model_order}"); axcv.set_xlabel(f"Model order")
+			axcv.legend()
+			plt.pause(0.01)
 			plt.draw()
 		plt.ioff()
 		plt.show()
 		# Print data:
 		print("\n\n#########\n#       #\n# Done! #\n#       #\n#########\n")
 		for i in range(len(order_cv_loss)):
-			print(orders_to_test[i], ": ", order_cv_loss[i])
+			print(orders_to_test[i], ": ", order_cv_loss[i], " , ", order_cv_loss_H[i])
 			
 
 

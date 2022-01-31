@@ -37,15 +37,15 @@ class ANN(nn.Module):
 			nn.ReLU(),
 			nn.Linear(s+1, 1, bias=True)
 		)
-		self.param_lr_gamma["shallowLinear"] = [100.0e-3, 0.96]
+		self.param_lr_gamma["shallowLinear"] = [90.0e-3, 0.96]
 
 		# Nonlinear sigmoid NN with ReLU activation function 
-		s = max([input_size, 5])
+		s = max([input_size, 3])
 		self.shallowNonlinear = nn.Sequential(
-			nn.Linear(input_size, s, bias=True),
+			nn.Linear(input_size, s+1, bias=True),
 			nn.Sigmoid(), # Sigmoid() and Tanh() are very similar
 			nn.ReLU(), # ELU() has very similar performance
-			nn.Linear(s, 1, bias=True)
+			nn.Linear(s+1, 1, bias=True)
 		)
 		self.param_lr_gamma["shallowNonlinear"] = [50.0e-3, 0.96]
 
@@ -60,7 +60,7 @@ class ANN(nn.Module):
 			nn.ReLU(),
 			nn.Linear(s+2, 1, bias=True),
 		)
-		self.param_lr_gamma["deepLinear"] = [10.0e-3, 0.95]
+		self.param_lr_gamma["deepLinear"] = [50.0e-3, 0.94]
 
 		# Deep Nonlinear NN
 		s = int(input_size*1.2)+2
@@ -69,11 +69,12 @@ class ANN(nn.Module):
 			nn.Tanh(),
 			nn.ELU(),
 			nn.Linear(input_size, s, bias=True),
-			nn.Sigmoid(),
+			nn.Mish(),
 			nn.ELU(),
+			#nn.Linear(s, min(5, input_size+3), bias=True),
 			nn.Linear(s, 1, bias=True)
 		)
-		self.param_lr_gamma["deepNonlinear"] = [100.0e-3, 0.96]
+		self.param_lr_gamma["deepNonlinear"] = [80.0e-3, 0.96]
 
 		# Very deep Nonlinear NN
 		s = int(input_size*1.2)+2
@@ -91,10 +92,10 @@ class ANN(nn.Module):
 			nn.ELU(),
 			nn.Linear(input_size, 1, bias=True)
 		)
-		self.param_lr_gamma["veryDeepNonlinear"] = [100.0e-3, 0.96]
-	
+		self.param_lr_gamma["veryDeepNonlinear"] = [110.0e-3, 0.94]
+
 	def forward(self, input_t):
-		out = self.deepNonlinear(input_t)
+		out = self.deepLinear(input_t)
 		return out.flatten()
 
 
@@ -111,6 +112,7 @@ class ANN(nn.Module):
 # Training and validation ANN loops
 
 def train_loop(dataloader, model, device, loss_fn, optimizer, verbose= True):
+	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	train_loss = 0
 	if verbose: print("Training...")
@@ -135,19 +137,36 @@ def train_loop(dataloader, model, device, loss_fn, optimizer, verbose= True):
 	return train_loss
 
 
-def valid_loop(dataloader, model, device, loss_fn, verbose= True):
+def valid_loop(dataloader, model, device, loss_fn, verbose=True, high_flow_loss=False):
+	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	test_loss = 0
+	test_loss_H = 0
 	if verbose: print("Validating...")
 	with torch.no_grad():
 		for sample_batched in dataloader:
 			X = sample_batched["input"].to(device)
 			Y = sample_batched["label"].to(device)
-			Y_ = model(X) *sample_batched["mstd"].to(device) + sample_batched["ma"].to(device)
+			st= sample_batched["mstd"].to(device)
+			m = sample_batched["ma"].to(device)
+			Y_ = model(X) * st + m
 			test_loss += loss_fn(Y_, Y).item()
+			if high_flow_loss:
+				l = 0
+				w = 2.1
+				while l < 10:
+					w -= 0.05
+					Y_h = Y_[Y>=torch.mean(m)+w*torch.mean(st)]
+					Yh  = Y[Y>=torch.mean(m)+w*torch.mean(st)]
+					l = len(Y_h)
+				test_loss_H += loss_fn(Y_h, Yh).item()
 	test_loss /= num_batches
+	test_loss_H /= num_batches
 	if verbose: print(f"Avg loss over batches: {test_loss:>8f}")
-	return test_loss
+	if high_flow_loss:
+		return test_loss, test_loss_H
+	else:
+		return test_loss
 
 
 
@@ -409,10 +428,12 @@ def get_modelOrdersToTest(Fmax_, Rmax_, i_rain, Tmax_, i_temp):
 	for f in range(1,Fmax_+1):
 		if (i_rain or Rmax_>0): # rain
 			if Rmax_>0: # proer rain
-				for r in range(1, Rmax_+1):
+				s = 0 if i_rain else 1
+				for r in range(s, Rmax_+1):
 					if (i_temp or Tmax_>0): # also temp
 						if Tmax_>0: # proper rain and also proer temp
-							for t in range(1, Tmax_+1):
+							s = 0 if i_temp else 1
+							for t in range(s, Tmax_+1):
 								orders_to_test.append([f, r, t])
 						else: # proper rain and only improper temp
 							orders_to_test.append([f, r, 0])
@@ -421,7 +442,8 @@ def get_modelOrdersToTest(Fmax_, Rmax_, i_rain, Tmax_, i_temp):
 			else: # only improper rain
 				if (i_temp or Tmax_>0): # also temp
 					if Tmax_>0: # only improper rain and also/only proer temp
-						for t in range(1, Tmax_+1):
+						s = 0 if i_temp else 1
+						for t in range(s, Tmax_+1):
 							orders_to_test.append([f, 0, t])
 					else: # only improper rain and only improper temp
 						orders_to_test.append([f, 0, 0])
@@ -429,7 +451,8 @@ def get_modelOrdersToTest(Fmax_, Rmax_, i_rain, Tmax_, i_temp):
 					orders_to_test.append([f, 0])
 		elif (not i_rain) and (Rmax_==0) and (i_temp or Tmax_>0): # just temp
 			if Tmax_>0: # also/only proer
-				for t in range(1, Tmax_+1):
+				s = 0 if i_temp else 1
+				for t in range(s, Tmax_+1):
 					orders_to_test.append([f, t])
 			else: # only improper
 				orders_to_test.append([f, 0])
