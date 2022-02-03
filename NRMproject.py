@@ -503,7 +503,7 @@ if PART_11:
 		Load data - put data into an object to make it easily accessible
 	'''
 	
-	if 1: # Single train/validation cycle
+	if 0: # Single train/validation cycle
 		''' model_type: save input type as indexes.
 			Allowed:
 			0: ""
@@ -516,7 +516,7 @@ if PART_11:
 			6: "F_R_IMP_T_PRO"
 			7: "F_R_IMP_T_IMP"
 		'''
-		model_type = "F_R_PRO_T_PRO"
+		model_type = "F_R_IMP_T_PRO"
 		model_order = [4, 3, 3]
 		include_day = False
 		cv_idx = 17
@@ -546,8 +546,8 @@ if PART_11:
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
 		net = ANN(n_input).to(device)
-		learning_rate = net.param_lr_gamma["deepLinear"][0]
-		gamma         = net.param_lr_gamma["deepLinear"][1] # the closer to one, the slower the decay
+		learning_rate = net.param_lr_gamma["deepNonlinear"][0]
+		gamma         = net.param_lr_gamma["deepNonlinear"][1] # the closer to one, the slower the decay
 		
 		#print(net.linear[0].weight, net.linear[0].bias)
 
@@ -619,7 +619,7 @@ if PART_11:
 	
 
 
-	if 0: # ITERATION ALONG A MODEL ORDER
+	if 1: # ITERATION ALONG A MODEL ORDER
 		''' '''
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
@@ -627,14 +627,14 @@ if PART_11:
 		batch_size = 73 # 5 batches / year
 		preproc = 1
 		epochs = 120
-		learning_rate = ANN(1).param_lr_gamma["deepLinear"][0]
-		gamma         = ANN(1).param_lr_gamma["deepLinear"][1]
+		learning_rate = ANN(1).param_lr_gamma["deepNonlinear"][0]
+		gamma         = ANN(1).param_lr_gamma["deepNonlinear"][1]
 		''' '''
 		model_type = "F_R_PRO_T_PRO"
 		include_day = False
 		i_rain = False
 		i_temp = False
-		Fmax_, Rmax_, Tmax_ = 5, 5, 5
+		Fmax_, Rmax_, Tmax_ = 5, 6, 6
 		orders_to_test = get_modelOrdersToTest(Fmax_, Rmax_, i_rain, Tmax_, i_temp)
 		orders_to_test = [[4, 3, 3]]
 		''' '''
@@ -672,6 +672,7 @@ if PART_11:
 															 shuffle=False,
 															 num_workers=0 )
 				n_input = len(train_dataset[0]["input"])
+				print(n_input)
 				net = ANN(n_input).to(device)
 				loss_fn = nn.MSELoss()
 				optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.95)
@@ -690,7 +691,7 @@ if PART_11:
 					valid_loss.append(np.sqrt(vl))
 					valid_loss_H.append(np.sqrt(vl_H))
 					# Plot data
-					if (t == 20) or (t % 40 == 0) or (t==epochs-1):
+					if (t == 20) or (t % 40 == 0) or (t>=epochs-6):
 						x = np.arange(1, t+1+1); axv.clear(); axv.grid()
 						axv.plot( x, np.array(train_loss), "r.-", label="Training")
 						axv.plot( x, np.array(valid_loss), "b.-", label="Validation")
@@ -720,7 +721,6 @@ if PART_11:
 		print("\n\n#########\n#       #\n# Done! #\n#       #\n#########\n")
 		for i in range(len(order_cv_loss)):
 			print(orders_to_test[i], ": ", order_cv_loss[i], " , ", order_cv_loss_H[i])
-			
 
 
 

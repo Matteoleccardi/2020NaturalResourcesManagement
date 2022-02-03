@@ -60,7 +60,7 @@ class ANN(nn.Module):
 			nn.ReLU(),
 			nn.Linear(s+2, 1, bias=True),
 		)
-		self.param_lr_gamma["deepLinear"] = [50.0e-3, 0.94]
+		self.param_lr_gamma["deepLinear"] = [70.0e-3, 0.94]
 
 		# Deep Nonlinear NN
 		s = int(input_size*1.2)+2
@@ -69,12 +69,11 @@ class ANN(nn.Module):
 			nn.Tanh(),
 			nn.ELU(),
 			nn.Linear(input_size, s, bias=True),
-			nn.Mish(),
+			nn.Sigmoid(),
 			nn.ELU(),
-			#nn.Linear(s, min(5, input_size+3), bias=True),
 			nn.Linear(s, 1, bias=True)
 		)
-		self.param_lr_gamma["deepNonlinear"] = [80.0e-3, 0.96]
+		self.param_lr_gamma["deepNonlinear"] = [100.0e-3, 0.94]
 
 		# Very deep Nonlinear NN
 		s = int(input_size*1.2)+2
@@ -95,11 +94,8 @@ class ANN(nn.Module):
 		self.param_lr_gamma["veryDeepNonlinear"] = [110.0e-3, 0.94]
 
 	def forward(self, input_t):
-		out = self.deepLinear(input_t)
+		out = self.deepNonlinear(input_t)
 		return out.flatten()
-
-
-
 
 
 
@@ -313,6 +309,18 @@ class Dataset01(Dataset):
 			ma = np.array([annualMovingAverage(series=series, semiwindow=6) for i in range(20)]).flatten()
 			mstd = np.array([np.sqrt(annualMovingVariance(series=series, semiwindow=6)) for i in range(20)]).flatten()
 			self.all_data[:,5] =  (self.all_data[:,5].copy() - ma) / mstd
+		elif self.preprocessing == 2:
+			''' Flow '''
+			self.all_data[:,4] =  self.all_data[:,4].copy() / self.flowMSTD
+			self.all_data[:,4] = self.all_data[:,4].copy()
+			''' Rain '''
+			series = self.all_data[self.trainIndex,3].copy()
+			mstd = np.array([np.sqrt(annualMovingVariance(series=series, semiwindow=6)) for i in range(20)]).flatten()
+			self.all_data[:,3] =  self.all_data[:,3].copy() / mstd
+			''' Temp '''
+			series = self.all_data[self.trainIndex,5].copy()
+			mstd = np.array([np.sqrt(annualMovingVariance(series=series, semiwindow=6)) for i in range(20)]).flatten()
+			self.all_data[:,5] =  self.all_data[:,5].copy() / mstd
 			
 		# Extract data - get data from the source
 		''' create an indexable array to extract data from the dataset faster
@@ -358,7 +366,11 @@ class Dataset01(Dataset):
 				The day is meant as the day we want to predict (t+1, not t)
 			'''
 			if self.inlude_day_of_year:
-				input_data = np.append(input_data, self.doy[self.n_past + index] )
+				alpha = 2*np.pi * self.doy[self.n_past + index] / 365
+				d_sin = np.sin(alpha)
+				d_cos = np.cos(alpha)
+				input_data = np.append(input_data,  d_sin)
+				input_data = np.append(input_data,  d_cos)
 			''' get input data row into a list containing all indexable inputs '''
 			
 			self.outputlist.append(
