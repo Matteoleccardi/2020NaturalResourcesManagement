@@ -281,5 +281,44 @@ def plot_linearARXlosses(loss, lossH, lossL, Nref=None, Pref=None):
 
 
 
+def plot_NNresults(valid_dataset, net, idx):
+	rgba = getRGBA()
+	FC = getFC()
+	year = str(int(idx+1990))
+	y_lab = []
+	y_est = []
+	net.to('cpu')
+	for i in range(len(valid_dataset[:]["label"][:])):
+		X = valid_dataset[i]["input"]
+		Y_ = net(X) *valid_dataset[i]["mstd"] + valid_dataset[i]["ma"] 
+		y_lab.append( valid_dataset[i]["label"].item() )
+		y_est.append( Y_.item() )
+	fig, [ax1, ax2, ax3] = plt.subplots(3)
+	fig.suptitle("Validation year "+year)
+	#
+	ax1.plot(y_est, y_lab, '.', alpha=0.7, color=rgba[17])
+	ax1.plot([0, max(y_est)], [0, max(y_est)], '--', linewidth=0.6, alpha=0.9, color=rgba[5])
+	ax1.set_xlabel("Estimated flow [$m^3/s$]")
+	ax1.set_ylabel("Measured flow [$m^3/s$]")
+	ax1.grid(linestyle='--', linewidth=0.5)
+	ax1.set_facecolor(getFC())
+	#
+	ax3.plot(y_lab, np.array(y_est) - np.array(y_lab), '.', alpha=0.8,  color=rgba[3])
+	ax3.set_xlabel("Observed streamflow [$m^3/s$]")
+	ax3.set_ylabel("Estimation - observation [$m^3/s$]")
+	ax3.set_title("Prediction error")
+	ax3.grid(linestyle='--', linewidth=0.5)
+	ax3.set_facecolor(getFC())
+	#
+	ax2.plot(range(len(valid_dataset[:]["label"][:])), y_lab, '-', linewidth=1.2, alpha=0.99,  color=rgba[1])
+	ax2.plot(range(len(valid_dataset[:]["label"][:])), y_est, '--', linewidth=1, alpha=0.85,  color=rgba[17])
+	ax2.set_xlabel("Days")
+	ax2.set_ylabel("Flow (blue predicted)")
+	ax2.grid(linestyle='--', linewidth=0.5)
+	ax2.set_facecolor(getFC())
+	#
+	plt.show()
+
+
 
 ''' ... '''

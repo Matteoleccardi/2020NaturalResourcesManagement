@@ -503,7 +503,7 @@ if PART_11:
 		Load data - put data into an object to make it easily accessible
 	'''
 	
-	if 0: # Single train/validation cycle
+	if 1: # Single train/validation cycle
 		''' model_type: save input type as indexes.
 			Allowed:
 			0: ""
@@ -516,8 +516,8 @@ if PART_11:
 			6: "F_R_IMP_T_PRO"
 			7: "F_R_IMP_T_IMP"
 		'''
-		model_type = "F_R_IMP_T_PRO"
-		model_order = [4, 3, 3]
+		model_type = "F_R_PRO_T_PRO"
+		model_order = [3, 4, 5]
 		include_day = False
 		cv_idx = 17
 		preproc = 1
@@ -590,43 +590,19 @@ if PART_11:
 		plt.show()
 		
 		# Scatterplot of labels-predictions and timeseries prediction for validation
-		y_lab = []
-		y_est = []
-		net.to('cpu')
-		for i in range(len(valid_dataset[:]["label"][:])):
-			X = valid_dataset[i]["input"]
-			Y_ = net(X) *valid_dataset[i]["mstd"] + valid_dataset[i]["ma"] 
-			y_lab.append( valid_dataset[i]["label"].item() )
-			y_est.append( Y_.item() )
-		fig, [ax1, ax2, ax3] = plt.subplots(3)
-		ax1.plot(y_est, y_lab, '.', alpha=0.7)
-		ax1.plot([0, max(y_est)], [0, max(y_est)], 'r--', linewidth=0.6, alpha=0.9)
-		ax1.set_xlabel("Estimated flow m3/s")
-		ax1.set_ylabel("Measured flow m3/s")
-		ax1.grid()
-		ax2.plot(range(len(valid_dataset[:]["label"][:])), y_lab, 'r-', alpha=0.9)
-		ax2.plot(range(len(valid_dataset[:]["label"][:])), y_est, 'b--', linewidth=0.8, alpha=0.7)
-		ax2.set_xlabel("Days")
-		ax2.set_ylabel("Flow (red measured)")
-		ax2.grid()
-		ax3.plot(y_lab, np.array(y_est) - np.array(y_lab), 'r.', alpha=0.9)
-		ax3.set_xlabel("Observed streamflow")
-		ax3.set_ylabel("Prediction error")
-		ax3.set_title("(Estimation - observation)")
-		ax3.grid()
-		plt.show()
+		plot_NNresults(valid_dataset, net, cv_idx)
 
 	
 
 
-	if 1: # ITERATION ALONG A MODEL ORDER
+	if 0: # ITERATION ALONG A MODEL ORDER
 		''' '''
 		device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		if torch.cuda.is_available(): torch.cuda.empty_cache()
 		''' '''
 		batch_size = 73 # 5 batches / year
 		preproc = 1
-		epochs = 120
+		epochs = 130
 		learning_rate = ANN(1).param_lr_gamma["deepNonlinear"][0]
 		gamma         = ANN(1).param_lr_gamma["deepNonlinear"][1]
 		''' '''
@@ -636,7 +612,7 @@ if PART_11:
 		i_temp = False
 		Fmax_, Rmax_, Tmax_ = 5, 6, 6
 		orders_to_test = get_modelOrdersToTest(Fmax_, Rmax_, i_rain, Tmax_, i_temp)
-		orders_to_test = [[4, 3, 3]]
+		#orders_to_test = [[5, 5, 10]]
 		''' '''
 		order_cv_loss = []
 		order_cv_loss_H = []
@@ -672,10 +648,9 @@ if PART_11:
 															 shuffle=False,
 															 num_workers=0 )
 				n_input = len(train_dataset[0]["input"])
-				print(n_input)
 				net = ANN(n_input).to(device)
 				loss_fn = nn.MSELoss()
-				optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.95)
+				optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
 				scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, verbose=False)
 				train_loss = []
 				valid_loss = []

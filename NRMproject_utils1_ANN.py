@@ -58,7 +58,7 @@ class ANN(nn.Module):
 			nn.ReLU(),
 			nn.Linear(s, s+2, bias=True),
 			nn.ReLU(),
-			nn.Linear(s+2, 1, bias=True),
+			nn.Linear(s+2, 3, bias=True),
 		)
 		self.param_lr_gamma["deepLinear"] = [70.0e-3, 0.94]
 
@@ -71,7 +71,7 @@ class ANN(nn.Module):
 			nn.Linear(input_size, s, bias=True),
 			nn.Sigmoid(),
 			nn.ELU(),
-			nn.Linear(s, 1, bias=True)
+			nn.Linear(s, 3, bias=True)			
 		)
 		self.param_lr_gamma["deepNonlinear"] = [100.0e-3, 0.94]
 
@@ -93,8 +93,15 @@ class ANN(nn.Module):
 		)
 		self.param_lr_gamma["veryDeepNonlinear"] = [110.0e-3, 0.94]
 
+		self.bil = nn.Bilinear(3, 3, 1, bias=True)
+
+
 	def forward(self, input_t):
 		out = self.deepNonlinear(input_t)
+		
+		out2 = self.deepLinear(input_t)
+		out = self.bil(out, out2)
+
 		return out.flatten()
 
 
