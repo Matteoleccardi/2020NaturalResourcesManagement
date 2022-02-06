@@ -9,6 +9,7 @@ import torch
 from NRMproject_utils0 import *
 from NRMproject_utils1_ANN import *
 from NRMproject_plots import *
+from NRMproject_utils2_trees import *
 
 DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
 DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
@@ -30,7 +31,8 @@ if 0 : printStationaryStats(flow, rain, temp)
 
 ### PROGRAM COMPARTMENTS
 PART_10 = 0
-PART_11 = 1
+PART_11 = 0
+PART_12 = 1
 
 
 
@@ -503,7 +505,7 @@ if PART_11:
 		Load data - put data into an object to make it easily accessible
 	'''
 	
-	if 1: # Single train/validation cycle
+	if 0: # Single train/validation cycle
 		''' model_type: save input type as indexes.
 			Allowed:
 			0: ""
@@ -700,8 +702,259 @@ if PART_11:
 
 
 
-	
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if PART_12:
+	from sklearn.tree import DecisionTreeRegressor
+	'''
+	class sklearn.tree.DecisionTreeRegressor( criterion='squared_error', splitter='best', max_depth=None,
+	                                          min_samples_split=2, min_samples_leaf=1, min_weight_fraction_leaf=0.0,
+	                                          max_features=None, random_state=None, max_leaf_nodes=None, min_impurity_decrease=0.0,
+	                                          ccp_alpha=0.0)
+	'''
+	if 0:
+		# Parameters
+		criterion="friedman_mse" # "squared_error"
+		splitter ="best" # random
+		max_depth = 15
+		min_samples_split=2 # The minimum number of samples required to split an internal node
+		min_samples_leaf =1 # minimum samples required per leaf
+		max_leaf_nodes=None
+
+
+		# Get data
+		model_type  = "F_R_PRO_T_PRO"
+		model_order = [4, 3, 3]
+		include_day = False
+		cv_id   = 17
+		preproc = 0
+
+		Xt, Yt = getTreesData(data.copy(),
+							train=True,
+	                        model_type=model_type,
+	                        model_order=model_order,
+	                        inlude_day_of_year=include_day,
+	                        cross_validation_index=cv_id,
+	                        preprocessing=preproc,
+	                        HL=False )
+		Xv, Xv_L, Xv_H, Yv, Yv_L, Yv_H = getTreesData(data.copy(),  
+														train=False,
+								                        model_type=model_type,
+								                        model_order=model_order,
+								                        inlude_day_of_year=include_day,
+								                        cross_validation_index=cv_id,
+								                        preprocessing=preproc,
+								                        HL=True )
+
+		# Fit regression model
+		regr_1 = DecisionTreeRegressor(criterion=criterion,
+			                           splitter=splitter,
+			                           max_depth=max_depth,
+		                               min_samples_split=min_samples_split, 
+		                               min_samples_leaf=min_samples_leaf,
+		                               max_leaf_nodes=max_leaf_nodes)
+		regr_1.fit(Xt, Yt)
+
+		# Predict
+		Y_ = regr_1.predict(Xv)
+		
+		print(treeRMSE(Y_, Yv))
+
+		plt.plot(Yvalid)
+		plt.plot(Y_)
+		plt.show()
+
+
+	if 0: # Trees
+		# Cycle to find best tree parameters
+		# Parameters
+		# Parameters
+		criterion="friedman_mse" # "squared_error"
+		splitter ="best" # random
+		max_depth = 10
+		min_samples_split=4 # The minimum number of samples required to split an internal node
+		min_samples_leaf =4 # minimum samples required per leaf
+		max_leaf_nodes=None
+
+		model_type  = "F_R_PRO"
+		include_day = False
+		orders_to_test = get_modelOrdersToTest(4, 4, False, 0, False)
+		preproc = 0
+
+		plt.ion()
+		fig_v, axv = plt.subplots()
+
+
+		loss, lossL, lossH = [], [], []
+		for model_order in orders_to_test:
+			s, sL, sH = 0, 0, 0
+			for cv_id in range(20):
+				Xt, Yt = getTreesData(data.copy(),
+									train=True,
+			                        model_type=model_type,
+			                        model_order=model_order,
+			                        inlude_day_of_year=include_day,
+			                        cross_validation_index=cv_id,
+			                        preprocessing=preproc,
+			                        HL=False )
+				Xv, Xv_L, Xv_H, Yv, Yv_L, Yv_H = getTreesData(data.copy(),  
+																train=False,
+										                        model_type=model_type,
+										                        model_order=model_order,
+										                        inlude_day_of_year=include_day,
+										                        cross_validation_index=cv_id,
+										                        preprocessing=preproc,
+										                        HL=True )
+				numTrials = 30
+				score, scoreL, scoreH = 0, 0, 0
+				for nt in range(numTrials):
+					# Fit regression model
+					regr_1 = DecisionTreeRegressor(criterion=criterion,
+						                           splitter=splitter,
+						                           max_depth=max_depth,
+					                               min_samples_split=min_samples_split, 
+					                               min_samples_leaf=min_samples_leaf,
+					                               max_leaf_nodes=max_leaf_nodes)
+					regr_1.fit(Xt, Yt)
+					# Predict
+					Y_ = regr_1.predict(Xv);     score += treeRMSE(Y_, Yv)/numTrials
+					Y_L = regr_1.predict(Xv_L);  scoreL+= treeRMSE(Y_L, Yv_L)/numTrials
+					Y_H = regr_1.predict(Xv_H);  scoreH+= treeRMSE(Y_H, Yv_H)/numTrials
+
+				s += score/20
+				sL += scoreL/20
+				sH += scoreH/20
+			loss.append(s)
+			lossL.append(sL)
+			lossH.append(sH)
+			# plot and print
+			print(model_order, s, sL, sH)
+			axv.clear()
+			x = range(1, len(loss)+1)
+			axv.plot(x, loss, "b.-")
+			axv.plot(x, lossL, "g.-")
+			axv.plot(x, lossH, "r.-")
+			axv.grid()
+			plt.pause(0.1)
+			plt.draw()
+
+
+		plt.ioff()
+		plt.figure()
+		x = range(1, len(loss)+1)
+		plt.plot(x, loss, "b.-")
+		plt.plot(x, lossL, "g.-")
+		plt.plot(x, lossH, "r.-")
+		plt.grid()
+		plt.show()
+
+
+
+	if 1: # Bagged trees
+			# Cycle to find best tree parameters
+			# Parameters
+			# Parameters
+			criterion="friedman_mse" # "squared_error"
+			splitter ="best" # random
+			max_depth = 10
+			min_samples_split=4 # The minimum number of samples required to split an internal node
+			min_samples_leaf =4 # minimum samples required per leaf
+			max_leaf_nodes=None
+
+			model_type  = "F_R_PRO"
+			include_day = False
+			orders_to_test = get_modelOrdersToTest(4, 4, False, 0, False)
+			preproc = 0
+
+			plt.ion()
+			fig_v, axv = plt.subplots()
+
+
+			loss, lossL, lossH = [], [], []
+			for model_order in orders_to_test:
+				s, sL, sH = 0, 0, 0
+				for cv_id in range(20):
+					Xt, Yt = getTreesData(data.copy(),
+										train=True,
+				                        model_type=model_type,
+				                        model_order=model_order,
+				                        inlude_day_of_year=include_day,
+				                        cross_validation_index=cv_id,
+				                        preprocessing=preproc,
+				                        HL=False )
+					Xv, Xv_L, Xv_H, Yv, Yv_L, Yv_H = getTreesData(data.copy(),  
+																	train=False,
+											                        model_type=model_type,
+											                        model_order=model_order,
+											                        inlude_day_of_year=include_day,
+											                        cross_validation_index=cv_id,
+											                        preprocessing=preproc,
+											                        HL=True )
+					numTrials = 20
+					score, scoreL, scoreH = 0, 0, 0
+					for nt in range(numTrials):
+						# Fit regression model
+						bagged = baggedTree(numTrees=30,criterion=criterion,
+							                            splitter=splitter,
+							                            max_depth=max_depth,
+						                                min_samples_split=min_samples_split, 
+						                                min_samples_leaf=min_samples_leaf,
+						                                max_leaf_nodes=max_leaf_nodes)
+						bagged.fit(Xt, Yt)
+						# Predict
+						Y_ = bagged.predict(Xv);     score += treeRMSE(Y_, Yv)/numTrials
+						Y_L = bagged.predict(Xv_L);  scoreL+= treeRMSE(Y_L, Yv_L)/numTrials
+						Y_H = bagged.predict(Xv_H);  scoreH+= treeRMSE(Y_H, Yv_H)/numTrials
+
+					s += score/20
+					sL += scoreL/20
+					sH += scoreH/20
+				loss.append(s)
+				lossL.append(sL)
+				lossH.append(sH)
+				# plot and print
+				print(model_order, s, sL, sH)
+				axv.clear()
+				x = range(1, len(loss)+1)
+				axv.plot(x, loss, "b.-")
+				axv.plot(x, lossL, "g.-")
+				axv.plot(x, lossH, "r.-")
+				axv.grid()
+				plt.pause(0.1)
+				plt.draw()
+
+
+			plt.ioff()
+			plt.figure()
+			x = range(1, len(loss)+1)
+			plt.plot(x, loss, "b.-")
+			plt.plot(x, lossL, "g.-")
+			plt.plot(x, lossH, "r.-")
+			plt.grid()
+			plt.show()
 
 
 
