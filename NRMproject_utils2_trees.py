@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import matplotlib
 import matplotlib.pylab as plt
 from sklearn.tree import DecisionTreeRegressor
@@ -57,7 +58,7 @@ def treeRMSE(listYest, listYlabel):
 ### BAGGED TREES
 
 class baggedTree():
-	def __init__(self, numTrees=5, criterion,splitter, max_depth, min_samples_split, min_samples_leaf, max_leaf_nodes):
+	def __init__(self, criterion,splitter, max_depth, min_samples_split, min_samples_leaf, max_leaf_nodes, numTrees=5):
 		self.n = numTrees
 		self.trees = []
 		for i in range(self.n):
@@ -81,9 +82,9 @@ class baggedTree():
 			self.trees[i].fit(X, Y)
 
 	def predict(self, X):
-		Ylist = []
+		Y = 0
 		for i in range(self.n):
-			Ylist.append( self.trees[i].predict(X) )
-		Y = np.mean(Ylist)
+			Y += self.trees[i].predict(X)
+		Y /= self.n
 		return Y
 

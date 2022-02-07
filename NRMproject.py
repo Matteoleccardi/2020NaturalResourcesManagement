@@ -789,8 +789,6 @@ if PART_12:
 
 
 	if 0: # Trees
-		# Cycle to find best tree parameters
-		# Parameters
 		# Parameters
 		criterion="friedman_mse" # "squared_error"
 		splitter ="best" # random
@@ -873,88 +871,173 @@ if PART_12:
 
 
 
-	if 1: # Bagged trees
-			# Cycle to find best tree parameters
-			# Parameters
-			# Parameters
-			criterion="friedman_mse" # "squared_error"
-			splitter ="best" # random
-			max_depth = 10
-			min_samples_split=4 # The minimum number of samples required to split an internal node
-			min_samples_leaf =4 # minimum samples required per leaf
-			max_leaf_nodes=None
+	if 0: # Bagged trees
+		# Parameters
+		criterion="friedman_mse" # "squared_error"
+		splitter ="best" # random
+		max_depth = 10
+		min_samples_split=4 # The minimum number of samples required to split an internal node
+		min_samples_leaf =4 # minimum samples required per leaf
+		max_leaf_nodes=None
 
-			model_type  = "F_R_PRO"
-			include_day = False
-			orders_to_test = get_modelOrdersToTest(4, 4, False, 0, False)
-			preproc = 0
+		model_type  = "F_R_PRO"
+		include_day = False
+		orders_to_test = get_modelOrdersToTest(3, 3, False, 0, False)
+		orders_to_test = [[2, 1]]
+		preproc = 0
 
-			plt.ion()
-			fig_v, axv = plt.subplots()
-
-
-			loss, lossL, lossH = [], [], []
-			for model_order in orders_to_test:
-				s, sL, sH = 0, 0, 0
-				for cv_id in range(20):
-					Xt, Yt = getTreesData(data.copy(),
-										train=True,
-				                        model_type=model_type,
-				                        model_order=model_order,
-				                        inlude_day_of_year=include_day,
-				                        cross_validation_index=cv_id,
-				                        preprocessing=preproc,
-				                        HL=False )
-					Xv, Xv_L, Xv_H, Yv, Yv_L, Yv_H = getTreesData(data.copy(),  
-																	train=False,
-											                        model_type=model_type,
-											                        model_order=model_order,
-											                        inlude_day_of_year=include_day,
-											                        cross_validation_index=cv_id,
-											                        preprocessing=preproc,
-											                        HL=True )
-					numTrials = 20
-					score, scoreL, scoreH = 0, 0, 0
-					for nt in range(numTrials):
-						# Fit regression model
-						bagged = baggedTree(numTrees=30,criterion=criterion,
-							                            splitter=splitter,
-							                            max_depth=max_depth,
-						                                min_samples_split=min_samples_split, 
-						                                min_samples_leaf=min_samples_leaf,
-						                                max_leaf_nodes=max_leaf_nodes)
-						bagged.fit(Xt, Yt)
-						# Predict
-						Y_ = bagged.predict(Xv);     score += treeRMSE(Y_, Yv)/numTrials
-						Y_L = bagged.predict(Xv_L);  scoreL+= treeRMSE(Y_L, Yv_L)/numTrials
-						Y_H = bagged.predict(Xv_H);  scoreH+= treeRMSE(Y_H, Yv_H)/numTrials
-
-					s += score/20
-					sL += scoreL/20
-					sH += scoreH/20
-				loss.append(s)
-				lossL.append(sL)
-				lossH.append(sH)
-				# plot and print
-				print(model_order, s, sL, sH)
-				axv.clear()
-				x = range(1, len(loss)+1)
-				axv.plot(x, loss, "b.-")
-				axv.plot(x, lossL, "g.-")
-				axv.plot(x, lossH, "r.-")
-				axv.grid()
-				plt.pause(0.1)
-				plt.draw()
+		plt.ion()
+		fig_v, axv = plt.subplots()
 
 
-			plt.ioff()
-			plt.figure()
+		loss, lossL, lossH = [], [], []
+		for model_order in orders_to_test:
+			s, sL, sH = 0, 0, 0
+			for cv_id in range(20):
+				Xt, Yt = getTreesData(data.copy(),
+									train=True,
+			                        model_type=model_type,
+			                        model_order=model_order,
+			                        inlude_day_of_year=include_day,
+			                        cross_validation_index=cv_id,
+			                        preprocessing=preproc,
+			                        HL=False )
+				Xv, Xv_L, Xv_H, Yv, Yv_L, Yv_H = getTreesData(data.copy(),  
+																train=False,
+										                        model_type=model_type,
+										                        model_order=model_order,
+										                        inlude_day_of_year=include_day,
+										                        cross_validation_index=cv_id,
+										                        preprocessing=preproc,
+										                        HL=True )
+				numTrials = 10
+				score, scoreL, scoreH = 0, 0, 0
+				for nt in range(numTrials):
+					# Fit regression model
+					bagged = baggedTree(numTrees=200,criterion=criterion,
+						                            splitter=splitter,
+						                            max_depth=max_depth,
+					                                min_samples_split=min_samples_split, 
+					                                min_samples_leaf=min_samples_leaf,
+					                                max_leaf_nodes=max_leaf_nodes)
+					bagged.fit(Xt, Yt)
+					# Predict
+					Y_ = bagged.predict(Xv);     score += treeRMSE(Y_, Yv)/numTrials
+					Y_L = bagged.predict(Xv_L);  scoreL+= treeRMSE(Y_L, Yv_L)/numTrials
+					Y_H = bagged.predict(Xv_H);  scoreH+= treeRMSE(Y_H, Yv_H)/numTrials
+
+				s += score/20
+				sL += scoreL/20
+				sH += scoreH/20
+			loss.append(s)
+			lossL.append(sL)
+			lossH.append(sH)
+			# plot and print
+			print(model_order, s, sL, sH)
+			axv.clear()
 			x = range(1, len(loss)+1)
-			plt.plot(x, loss, "b.-")
-			plt.plot(x, lossL, "g.-")
-			plt.plot(x, lossH, "r.-")
-			plt.grid()
-			plt.show()
+			axv.plot(x, loss, "b.-")
+			axv.plot(x, lossL, "g.-")
+			axv.plot(x, lossH, "r.-")
+			axv.grid()
+			plt.pause(0.1)
+			plt.draw()
+
+
+		plt.ioff()
+		plt.figure()
+		x = range(1, len(loss)+1)
+		plt.plot(x, loss, "b.-")
+		plt.plot(x, lossL, "g.-")
+		plt.plot(x, lossH, "r.-")
+		plt.grid()
+		plt.show()
+
+
+
+	if 0: # Random forests
+		from sklearn.ensemble import RandomForestRegressor
+		# Parameters
+		criterion="friedman_mse" # "squared_error"
+		splitter ="best" # random
+		max_depth = 10
+		min_samples_split=4 # The minimum number of samples required to split an internal node
+		min_samples_leaf =4 # minimum samples required per leaf
+		max_leaf_nodes=None
+
+		model_type  = "F_R_PRO"
+		model_order = [2, 1]
+		include_day = False
+		preproc = 0
+
+		plt.ion()
+		fig_v, axv = plt.subplots()
+
+
+		loss, lossL, lossH = [], [], []
+		# cycle over number of trees
+		NT = [3, 5, 10, 15, 20]
+		for N in NT:
+			s, sL, sH = 0, 0, 0
+			for cv_id in range(20):
+				Xt, Yt = getTreesData(data.copy(),
+									train=True,
+			                        model_type=model_type,
+			                        model_order=model_order,
+			                        inlude_day_of_year=include_day,
+			                        cross_validation_index=cv_id,
+			                        preprocessing=preproc,
+			                        HL=False )
+				Xv, Xv_L, Xv_H, Yv, Yv_L, Yv_H = getTreesData(data.copy(),  
+																train=False,
+										                        model_type=model_type,
+										                        model_order=model_order,
+										                        inlude_day_of_year=include_day,
+										                        cross_validation_index=cv_id,
+										                        preprocessing=preproc,
+										                        HL=True )
+				numTrials = 15
+				score, scoreL, scoreH = 0, 0, 0
+				for nt in range(numTrials):
+					# Fit regression model
+					forest = RandomForestRegressor(n_estimators=N,
+						                            max_samples=0.70,
+						                            criterion=criterion,
+						                            max_depth=max_depth,
+					                                min_samples_split=min_samples_split, 
+					                                min_samples_leaf=min_samples_leaf,
+					                                max_leaf_nodes=max_leaf_nodes)
+					forest.fit(Xt, Yt)
+					# Predict
+					Y_ = forest.predict(Xv);     score += treeRMSE(Y_, Yv)/numTrials
+					Y_L = forest.predict(Xv_L);  scoreL+= treeRMSE(Y_L, Yv_L)/numTrials
+					Y_H = forest.predict(Xv_H);  scoreH+= treeRMSE(Y_H, Yv_H)/numTrials
+
+				s += score/20
+				sL += scoreL/20
+				sH += scoreH/20
+			loss.append(s)
+			lossL.append(sL)
+			lossH.append(sH)
+			# plot and print
+			print(N, s, sL, sH)
+			axv.clear()
+			x = range(1, len(loss)+1)
+			axv.plot(x, loss, "b.-")
+			axv.plot(x, lossL, "g.-")
+			axv.plot(x, lossH, "r.-")
+			axv.grid()
+			plt.pause(0.1)
+			plt.draw()
+
+
+		plt.ioff()
+		plt.figure()
+		plt.plot(NT, loss, "b.-")
+		plt.plot(NT, lossL, "g.-")
+		plt.plot(NT, lossH, "r.-")
+		plt.grid()
+		plt.show()
 
 
 
