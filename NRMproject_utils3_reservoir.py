@@ -29,6 +29,8 @@ class reservoir():
 		self.update_release()
 		# Utilities
 		self.days_to_seconds = 24*60*60
+		# Operating policy related to the reservoir
+		self.policy = operating_policy(self.h_max_flood, self.h_min, p=None)
 
 	def net_inflow(self, inflow, rain):
 		rain = 0.001 * rain * self.surface_area / (self.days_to_seconds) # from mm/d to m3/s
@@ -38,7 +40,7 @@ class reservoir():
 		if self.level <= self.h_min:
 			self.release = 0
 		else:
-			self.v_out = np.sqrt( 2*(9.81*(self.level-self.h_min) + 100000/997) )
+			self.v_out = np.sqrt( 2*9.81*(self.level-self.h_min) )
 			self.release_cs = u_release * self.release_cs_max
 			# Spillways contribution
 			self.release = self.release_cs * self.v_out # m3/s
@@ -58,6 +60,52 @@ class reservoir():
 		if self.overtop > 0: W = 0
 		return W/1e6 # MegaWatt = 10^6 J/s daily average
 
+	def get_policy_u(self):
+		return self.policy.get_u(self.level)
+
+
+
+
+class operating_policy():
+	def __init__(self, h_max_flood, h_ds = 5, p=None):
+		self.h_min = h_ds + 2
+		self.h_max = h_max_flood - 1
+		if p is None:
+			x2 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+			y  = np.random.random_sample()
+			x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+			while x1 >= x2:
+				x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+			self.p = np.array([x1, y, x2])
+		elif len(p) == 3:
+			if p[2] >= self.h_max:
+				p[2] = self.h_max - np.random.random_sample()
+			if p[2] <= self.h_min:
+				p[2] = self.h_max - np.random.random_sample()*(self.h_max-self.h_min)/2
+			p[1] = np.max( [np.min([p[1], 1]), 0] )
+			if (p[0] <= self.h_min) or (p[0] >= self.h_max):
+				p[0] = self.h_min + np.random.random_sample()
+				while p[0] >= p[2]:
+					p[0] = self.h_min + np.random.random_sample()
+			self.p = np.array([p[0], p[1], p[2]]) 
+		else:
+			print("Wrong number of parameters in operating policy.")
+			quit()
+
+	def get_u(self, level):
+		u = 0.0
+		if (level > self.h_min) and (level <= self.p[0]):
+			u = ( (self.p[1]-0)/(self.p[0]-self.h_min) )*(level-self.h_min)+0
+		if (level > self.p[0]) and (level <= self.p[2]):
+			u = self.p[1]
+		if (level > self.p[2]) and (level <= self.h_max):
+			u = ( (1-self.p[1])/(self.h_max-self.p[2]) )*(level-self.p[2])+self.p[1]
+		if level > self.h_max:
+			u = 1.0
+		return u
+
+	def update_params(self):
+		self.p = self.p
 
 
 
@@ -75,11 +123,9 @@ class reservoir():
 # Water supply for irrigation: reliability, vulnerability, resilience
 ''' w is water demand expressed as m3/s daily mean '''
 def Iirr_reliability(x, w):
-	if size(w) != 1: quit()
 	out = np.sum( x >= w ) / len(x)
 	return out
 def Iirr_vulnerability(x, w, power=1):
-	if size(w) != 1: quit()
 	num = np.sum( np.max(w - x, 0) ) ** power
 	den = np.sum( x < w )
 	if den == 0:
@@ -88,7 +134,6 @@ def Iirr_vulnerability(x, w, power=1):
 		res = num / den
 	return res
 def Iirr_resilience(x, w):
-	if size(w) != 1: quit()
 	den = x[:-1] < w
 	num = np.sum( den and (x[1:] >= w) )
 	den = np.sum(x[:-1] < w)
@@ -98,35 +143,118 @@ def Iirr_resilience(x, w):
 		res = num / den
 	return res
 
-
 # Water supply for hydroelectric power
+def Ipow_Avg(power):
+	''' power is not additive like i.e. water demand '''
+	return np.mean(power)
 
+def Ipow_reliability(power, pow_demand):
+	out = np.sum( power >= pow_demand ) / len(power)
+	return out
+
+def Ipow_vulnerability(power, pow_demand, risk_aversion=1):
+	num = np.sum( np.max(pow_demand - power, 0) ) ** risk_aversion
+	den = np.sum( power < pow_demand )
+	if den == 0:
+		res = 0
+	else:
+		res = num / den
+	return res
+
+def Ipow_resilience(power, pow_demand):
+	den = power[:-1] < pow_demand
+	num = np.sum( den and (power[1:] >= pow_demand) )
+	den = np.sum(power[:-1] < pow_demand)
+	if den == 0:
+		res = 0
+	else:
+		res = num / den
+	return res
 
 # Flooding indicators
 ''' h_max is the flood threshold '''
 def Iflood_yearly_avg(h, hmax):
-	if size(hmax) != 1: quit()
 	n_years = len(h)/365
 	out = np.sum( h >= hmax ) / n_years
 	return out
+
 def Iflood_max_area(h, hmax):
 	steepness = 0.087 # steepness of 5 degrees
 	x = (h-hmax)/steepness
 	x_max = np.max([x, 0])
 	return x_max
 
-# Environmental indicators
-def Ienv_low_pulses(x, LP):
-	''' LP is the 25 percentile of the natural system '''
-	if size(LP) != 1: quit()
-	n_years = len(x)/365
-	out = np.sum( x < LP ) / n_years
+def Iflood_kayakClub(h, h_active_storage):
+	h_club = h_active_storage + 3 # m
+	n_years = len(h)/365
+	out = np.sum( h >= h_active_storage ) / n_years
 	return out
-def Ienv_high_pulses(x, HP):
+
+# Environmental indicators
+def Ienv_low_pulses(release, LP):
+	''' LP is the 25 percentile of the natural system '''
+	n_years = len(release)/365
+	out = np.sum( release < LP ) / n_years
+	return out
+
+def Ienv_high_pulses(release, HP):
 	''' HP is the 75 percentile of the natural system '''
-	if size(HP) != 1: quit()
-	n_years = len(x)/365
+	n_years = len(release)/365
 	out = np.sum( x > HP ) / n_years
 	return out
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+### OTHER UTILITIES ###
+
+def moving_perc(flow, sw=20, perc=25):
+	flow1 = flow[-sw:]
+	flow1 = np.append(flow1, flow)
+	flow1 = np.append(flow1, flow[:sw])
+	fp = []
+	for i in range(sw, len(flow)+sw):
+		fp.append( np.percentile(flow1[i-sw:i+sw], perc) )
+	return np.array(fp)
+
+
+def powerDemand_to_heightDemand(A_cs_1 = 1.77, N=1, area=981.405000):
+	A_cs = A_cs_1 * N
+	power_demand_yearly_dynamic = 1000000*Power_demand + 5*np.cos(2*np.pi*np.arange(365)/365)**3
+	pd = np.array([power_demand_yearly_dynamic for i in range(20)]).flatten()
+	hd = 5 + ( (pd/(0.9*0.5*997*A_cs))**(2/3) - (101325/997) )/(2*9.81)
+	print(np.max(hd), 1000*1000*area*np.max(hd))
+	plt.plot(hd)
+	plt.show()
+	
+def storage_capacity_design():
+	''' this is not afunction, it is just a place to store unused code '''
+	perc_25 = np.repeat(np.percentile(flow, 25), len(flow))
+	perc_75 = np.repeat(np.percentile(flow, 75), len(flow))
+	m_perc=moving_perc(flow, sw=45, perc=50)
+	target_r = m_perc
+	s = 0
+	s_dyn = []
+	for i in range(len(flow)):
+		s = s + (-flow[i] + target_r[i])*24*60*60
+		if s < 0: s=0
+		s_dyn.append(s)
+	s_dyn = np.array(s_dyn)
+	plt.plot(target_r)
+	plt.plot(flow, alpha=0.6)
+	plt.show()
+	plt.figure()
+	plt.plot(s_dyn)
+	plt.show()
+	print(np.max(s_dyn))
