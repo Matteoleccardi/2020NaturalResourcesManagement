@@ -20,7 +20,7 @@ month = data[:,1]
 day_m = data[:,2] # day number from month start (1-30)
 day_y = np.array([range(1,365+1,1) for i in range(20)]).reshape((365*20, 1)) # day numbered from year start (1-365)
 rain  = data[:,3] # mm/d
-flow  = data[:,4] # m3/d
+flow  = data[:,4] # m3/s
 temp  = data[:,5] # °C
 
 ### RAW DATA VISUALIZATION
