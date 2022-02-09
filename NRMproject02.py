@@ -91,10 +91,8 @@ tested_reservoir = A1
 
 # ######
 res = A5
-dh_target = 68.47
-u_target_max = perc_75 / (A_cs_1*11*np.sqrt(2*9.81*dh_target))
-#policy = operating_policy(h_max_flood=110, h_ds = 5, p=np.array([80, 0.1, 115]))
-#A1.policy = policy
+policy = operating_policy(h_max_flood=res.h_max_flood, h_ds = 5, p=np.array([68, 0.5, 5+68+2]))
+res.policy = policy
 
 level = []
 release = []
@@ -109,10 +107,7 @@ for j in range(N):
 			if res.level >res.h_max_flood - 10 : block=False
 		else:
 			u_valve = res.get_policy_u()
-			#u_valve = u_target_max
-			#u_max =  perc_95 / (A_cs_1*11*np.sqrt(2*9.81*(res.level-5)))
-			#u_max = u_max/(1.5*res.level - 1.5*res.h_max_flood) + u_valve
-			#u_valve = u_max if (res.level >= res.h_max_flood) else u_valve
+			
 		res.update_valve(u_valve)
 		# at time t+1
 		res.update_level(flow[t+1], rain[t+1])
