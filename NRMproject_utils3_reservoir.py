@@ -2,9 +2,10 @@
 import numpy as np
 import matplotlib
 import matplotlib.pylab as plt
+import copy
 
 
-### RESERVOIR MODELS ###
+### RESERVOIR MODEL ###
 
 class reservoir():
 	def __init__(self, surface_area, evaporation_rate, h_min, h_max_dam, h_max_flood, total_release_pipes_cross_section, initial_level, policy_params=None):
@@ -68,19 +69,14 @@ class reservoir():
 		return self.policy.get_u(self.level)
 
 
-
+### OPERATING POLICIES DEFINITION ###
 
 class operating_policy():
 	def __init__(self, h_max_flood, h_ds = 5, p=None):
 		self.h_min = h_ds + 2
 		self.h_max = h_max_flood + 1
 		if p is None:
-			x2 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
-			y  = np.random.random_sample()
-			x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
-			while x1 >= x2:
-				x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
-			self.p = np.array([x1, y, x2])
+			self.uniform_shuffle_params()
 		elif len(p) == 3:
 			if p[2] >= self.h_max:
 				p[2] = self.h_max - np.random.random_sample()
@@ -108,10 +104,256 @@ class operating_policy():
 			u = 1.0
 		return u
 
-	def update_params(self):
-		self.p = self.p
+	def update_params(self, p):
+		if len(p) == 3:
+			if p[2] >= self.h_max:
+				p[2] = self.h_max - np.random.random_sample()
+			if p[2] <= self.h_min:
+				p[2] = self.h_max - np.random.random_sample()*(self.h_max-self.h_min)/2
+			p[1] = np.max( [np.min([p[1], 1]), 0] )
+			if (p[0] <= self.h_min) or (p[0] >= self.h_max):
+				p[0] = self.h_min + np.random.random_sample()
+				while p[0] >= p[2]:
+					p[0] = self.h_min + np.random.random_sample()
+			self.p = np.array([p[0], p[1], p[2]]) 
+		else:
+			print("Wrong number of parameters while updating operating policy.")
+			quit()
+
+	def uniform_shuffle_params(self):
+		x2 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+		y  = np.random.random_sample()
+		x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+		while x1 >= x2:
+			x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+		self.p = np.array([x1, y, x2])
+
+	def normal_shuffle_params(self, variance=0.3):
+		x2 = np.random.normal(self.p[2], variance*(self.h_max-self.h_min))
+		while (x2 >= self.h_max-0.1) or (x2 <= self.h_min+1):
+			x2 = np.random.normal(self.p[2], variance*(self.h_max-self.h_min))
+		y = np.random.normal(self.p[1], variance)
+		while (y >= 1) or (y <= 0):
+			y = np.random.normal(self.p[1], variance)
+		x1 = np.random.normal(self.p[0], variance*(self.h_max-self.h_min))
+		while (x1 >= x2) or (x1 <= self.h_min):
+			x1 = np.random.normal(self.p[0], variance*(self.h_max-self.h_min))
+		self.p = np.array([x1, y, x2])
+	
 
 
+
+### GENETIC ALGORITHM ###
+
+class population():
+	def __init__(self,
+		base_model,
+		mating_probability_distribution,
+		indices_list,
+		indices_params_list,
+		indices_inputs_list,
+		N_individuals=10,
+		mutation_probability=0.1,
+		mutation_variance=0.5,
+		indices_for_selection_list=[0]):
+		# define population and basic population model
+		self.base_individual = copy.deepcopy(base_model)
+		self.N_individuals = N_individuals
+		self.mating_probability_distribution = mating_probability_distribution
+		self.mutation_probability = mutation_probability
+		self.mutation_variance = mutation_variance
+		self.indices_list = indices_list
+		self.indices_params_list = indices_params_list
+		self.indices_inputs_list = indices_inputs_list
+		self.indices_for_selection_list = indices_for_selection_list
+		self.gen_performance = []
+		self.N_generations=0
+		# Initialise population
+		self.population = []
+		for i in range(self.N_individuals):
+			indiv = copy.deepcopy(self.base_individual)
+			indiv.policy.uniform_shuffle_params()
+			self.population.append( indiv )
+
+	def test(self, flow, rain):
+		performance = [] #list: performance[individual ID][Performance indices]
+		for n in range(self.N_individuals):
+			# Simulate system
+			level = []
+			release = []
+			power = []
+			for t in range(len(flow)):
+				# at time t
+				u_valve = self.population[n].get_policy_u()	
+				self.population[n].update_valve(u_valve)
+				# step forward: t -> t+1
+				self.population[n].update_level(flow[t], rain[t])
+				level.append(self.population[n].level)
+				release.append(self.population[n].release)
+				power.append(self.population[n].get_power())
+			measures = {
+				"level":   np.array(level),
+				"release": np.array(release),
+				"power":   np.array(power)
+			}
+			# Append performances related to individual n
+			perf_list_temp = []
+			for i in range(len(self.indices_list)):
+				inp = measures[self.indices_inputs_list[i]][-365:]
+				par = self.indices_params_list[i]
+				perform = self.indices_list[i](inp, par)
+				perf_list_temp.append( perform )
+			performance.append(perf_list_temp)
+		self.gen_performance.append( np.array(performance) ) #[n_generation][idx_individual,idx_Index]
+
+	def apply_selection(self, selection_type="top half", indices_for_selection=[0]):
+		''' after this method, the population will be ranked in order of best performance '''
+		if selection_type == "all":
+			if len(indices_for_selection) == 1:
+				''' single objective '''
+				rank_idx = np.argsort(self.gen_performance[-1][:,indices_for_selection[0]])
+				rearranged_pop = []
+				for idx in rank_idx:
+					rearranged_pop.append(self.population[idx])
+				self.population = rearranged_pop
+			elif len(indices_for_selection) >= 2:
+				''' multi objective '''
+				pass 
+			else:
+				quit()
+		elif selection_type == "top half":
+			if len(indices_for_selection) == 1:
+				''' single objective '''
+				rank_idx = np.argsort(self.gen_performance[-1][:,indices_for_selection[0]])
+				top_half_idx = rank_idx[:int(self.N_individuals/2)]
+				rearranged_pop = []
+				for idx in top_half_idx:
+					rearranged_pop.append(self.population[idx])
+				self.population = rearranged_pop
+			elif len(indices_for_selection) >= 2:
+				''' multi objective '''
+				pass 
+			else:
+				quit()		
+		else:
+			quit()
+
+	def apply_mating(self, n_partners=2, n_survivors=3):
+		if n_survivors >= len(self.population):
+			n_survivors = len(self.population)-1
+		n_partners = np.min( [np.max([n_partners, 2]) , len(self.population)-1] )
+		new_population = []
+		for i in range(n_survivors):
+			survivor = copy.deepcopy(self.base_individual)
+			survivor.policy.update_params(self.population[i].policy.p)
+			new_population.append( survivor )
+		for i in range(n_survivors, self.N_individuals):
+			# select parents
+			prob = self.mating_probability_distribution.rvs(size=n_partners)
+			for j in range(len(prob)):
+				prob[j] = prob[j] if (prob[j] < len(self.population)) else len(self.population)-1
+			parents = []
+			for p in prob: parents.append( self.population[p] )
+			# weight parents contributions
+			prob_exchange = np.random.random_sample((3,n_partners))
+			prob_exchange[0,:] /= np.sum(prob_exchange[0,:]) # normalise each parent conribution to parameter p[0]
+			prob_exchange[1,:] /= np.sum(prob_exchange[1,:]) # normalise each parent conribution to parameter p[1]
+			prob_exchange[2,:] /= np.sum(prob_exchange[2,:]) # normalise each parent conribution to parameter p[2]
+			# mate and have child
+			p_child = np.zeros(3)
+			for i in range(n_partners):
+				p_child += prob_exchange[:,i]*parents[i].policy.p
+			# save new individual
+			new_individual = copy.deepcopy(self.base_individual)
+			new_individual.policy.update_params(p_child)
+			new_population.append( new_individual )
+		self.population = new_population
+
+	def apply_mutation(self, mutation_type="gaussian"):
+		for i in range(self.N_individuals):
+			if np.random.random_sample() < self.mutation_probability:
+				if mutation_type == "punctual gaussian":
+					draw = int(np.round( np.random.random_sample()*3-0.5 ))
+					p = self.population[i].policy.p
+					var = 0.5 if draw == 1 else 15
+					p[draw] = np.random.normal(p[draw], self.mutation_variance*var)
+					self.population[i].policy.update_params(p)
+				elif mutation_type == "punctual random":
+					draw = int(np.round( np.random.random_sample()*3-0.5 ))
+					p = self.population[i].policy.p
+					if draw == 1:
+						var = 1; add=0
+					else:
+						var=(self.population[i].policy.h_max-self.population[i].policy.h_min)
+						add=self.population[i].policy.h_min
+					p[draw] = np.random.random_sample()*self.mutation_variance*var + add
+					self.population[i].policy.update_params(p)
+				elif mutation_type == "gaussian":
+					self.population[i].policy.normal_shuffle_params(variance=self.mutation_variance)
+				elif mutation_type == "random":
+					self.population[i].policy.uniform_shuffle_params()
+				else:
+					quit()
+
+	def fully_evolve(self,
+		flow,
+		rain,
+		N_generations=10,
+		selection_type="top half",
+		indices_for_selection=None,
+		n_partners=2,
+		n_survivors=3,
+		mutation_type="gaussian"):
+		self.N_generations = N_generations
+		if indices_for_selection is None:
+			indices_for_selection=self.indices_for_selection_list
+		# setup interactive plot
+		plt.ion()
+		fig, ax = plt.subplots(3)
+		# cycle variables
+		perf0=0
+		# cycle through the generations
+		for i in range(N_generations):
+			print("Generation ", i+1)
+			self.test(flow, rain)
+			self.apply_selection(selection_type=selection_type, indices_for_selection=indices_for_selection)
+			self.apply_mating(n_partners=n_partners, n_survivors=n_survivors)
+			self.apply_mutation(mutation_type=mutation_type)
+			# Dynamic parameters
+			
+			# Plot
+			perf = []
+			for j in range(len(self.gen_performance)):
+				perf.append(np.min(self.gen_performance[j][:,0]))
+			ax[0].clear() 
+			ax[0].plot(np.arange(i+1)+1,perf, '.-')
+			ax[0].grid()
+			ax[0].set_title("Objective 1")
+			perf = []
+			for j in range(len(self.gen_performance)):
+				perf.append(np.min(self.gen_performance[j][:,1]))
+			ax[1].clear() 
+			ax[1].plot(np.arange(i+1)+1,perf, '.-')
+			ax[1].grid()
+			ax[1].set_title("Objective 2")
+			ax[1].set_xlabel("Generations")
+			ax[2].clear()
+			if j-1 >= 0:
+				ax[2].scatter(self.gen_performance[j-1][:,0], self.gen_performance[j-1][:,1], alpha=0.7, c="blue")
+			ax[2].scatter(self.gen_performance[j][:,0], self.gen_performance[j][:,1], alpha=0.9, c="red")
+			ax[2].grid()
+			plt.pause(0.5)
+			plt.draw()
+		
+		self.gen_performance = np.array(self.gen_performance)
+		
+		# Prot final results
+		ax[0].grid()
+		plt.ioff()
+		#fig1, ax1 = plt.subplots(1)
+		#perf = np.max(self.gen_performance[:,idx_individual,0], axis=1)  #[n_generation,idx_individual,idx_Index]
+		#plt.plot(perf)
+		plt.show()
 
 
 
@@ -148,9 +390,12 @@ def Iirr_resilience(x, w):
 	return res
 
 # Water supply for hydroelectric power
-def Ipow_Avg(power):
+def Ipow_Avg(power, dummy=0):
 	''' power is not additive like i.e. water demand '''
 	return np.mean(power)
+
+def I_pow_RMSE_from_setpoint(power, power_setpoint):
+	return np.sqrt( np.mean( (power-power_setpoint)**2 ) )
 
 def Ipow_reliability(power, pow_demand):
 	out = np.sum( power >= pow_demand ) / len(power)
@@ -204,8 +449,13 @@ def Ienv_low_pulses(release, LP):
 def Ienv_high_pulses(release, HP):
 	''' HP is the 75 percentile of the natural system '''
 	n_years = len(release)/365
-	out = np.sum( x > HP ) / n_years
+	out = np.sum( release > HP ) / n_years
 	return out
+
+def Ienv_high_pulses_mean(release, HP):
+	''' HP is the 75 percentile of the natural system '''
+	mean = np.mean( release[release> HP] )+0.001
+	return mean
 
 
 

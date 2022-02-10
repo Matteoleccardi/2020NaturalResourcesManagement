@@ -2,6 +2,8 @@
 import numpy as np
 import matplotlib
 import matplotlib.pylab as plt
+import copy
+from scipy.stats import planck
 
 from NRMproject_utils0 import *
 from NRMproject_plots import *
@@ -84,11 +86,134 @@ A5 = reservoir(
 		initial_level = 0
 		)
 
-tested_reservoir = A1
+tested_reservoir = A5
+
+
+# EMODPS - EVOLUTIONARY MULTY OBJECTIVE DIRECT POLICY SEARCH
+
+# Population data
+N_individuals=50
+# Total generations
+N_generations = 35
+# inputs
+N_iterations = 3
+ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
+ext_rain = np.array([rain for i in range(N_iterations)]).flatten().copy()
+# objectives
+indices_list=[I_pow_RMSE_from_setpoint, Ienv_high_pulses_mean]
+indices_params_list=[50, perc_75]
+indices_inputs_list=["power", "release"]
+# optimization
+indices_for_selection_list = [1] # first element of "indices_list"
+# selection strategy
+selection_type="top half"
+n_survivors=0 # 0 should be always fine
+# mating strategy
+n_partners=3
+# mutation strategy
+mutation_type="random"
+mating_prob = planck(lambda_=0.7)
+mutation_prob = 0.31
+mutation_variance = 0.5
+
+
+pop = population(
+	base_model=A5,
+	N_individuals=N_individuals,
+	mating_probability_distribution=mating_prob,
+	mutation_probability=mutation_prob,
+	mutation_variance=mutation_variance,
+	indices_list=indices_list,
+	indices_params_list=indices_params_list,
+	indices_inputs_list=indices_inputs_list,
+	indices_for_selection_list=indices_for_selection_list
+	)
+
+pop.fully_evolve(
+	N_generations=N_generations,
+	flow=ext_flow,
+	rain=ext_rain,
+	selection_type=selection_type,
+	n_partners=n_partners,
+	n_survivors=n_survivors,
+	mutation_type=mutation_type
+	)
 
 
 
 
+
+
+
+
+quit()
+'''
+# Initial population
+N_individuals = 30
+population = []
+for i in range(N_individuals):
+	tested_reservoir.policy.uniform_shuffle_params()
+	population.append( copy.deepcopy(tested_reservoir) )
+# first run
+performance = []
+power_setpoint = 40
+for n in range(N_individuals): # Simulate individuals
+	# Simulate system
+	level = []
+	release = []
+	power = []
+	for t in range(len(ext_flow)):
+		# at time t
+		u_valve = population[n].get_policy_u()	
+		population[n].update_valve(u_valve)
+		# at time t+1
+		f = ext_flow[t]
+		r = ext_rain[t]
+		population[n].update_level(f, r)
+		level.append(population[n].level)
+		release.append(population[n].release)
+		power.append(population[n].get_power())
+	level = np.array(level)
+	release = np.array(release)
+	power = np.array(power)
+	performance.append(objective(power, power_setpoint))
+
+# selection
+rank_idx = np.argsort(performance)
+best = rank_idx[:int(N_individuals/2)]
+# mating
+new_population = []
+for i in range(3):
+	new_individual = tested_reservoir
+	new_individual.policy.update_params(population[best[i]].policy.p)
+	new_population.append( copy.deepcopy(new_individual) )
+for i in range(3, N_individuals):
+	[prob1, prob2] = mating_prob.rvs(size=2)
+	prob1 = prob1 if prob1<len(best) else prob1=len(best)
+	prob2 = prob2 if prob2<len(best) else prob2=len(best)
+	p1 = population[best[prob1]].policy.p
+	p2 = population[best[prob2]].policy.p
+	prob_exchange = np.random.random_sample((3,))
+	p_child = prob_exchange*p1 + (1-prob_exchange)*p2
+	new_individual = tested_reservoir
+	new_individual.policy.update_params(p_child)
+	new_population.append( copy.deepcopy(new_individual) )
+# mutation
+for i in range(len(new_population)):
+	if np.random.random_sample() < mutation_prob
+		new_population[i].policy.normal_shuffle_params(self, variance=mutation_valiance)
+
+# update population and repeat
+
+plt.plot(performance, '.-')
+plt.show()
+
+
+
+
+
+quit()
+'''
 # ######
 res = A5
 policy = operating_policy(h_max_flood=res.h_max_flood, h_ds = 5, p=np.array([68, 0.5, 5+68+2]))
