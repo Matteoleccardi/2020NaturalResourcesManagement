@@ -216,9 +216,21 @@ class population():
 				for idx in rank_idx:
 					rearranged_pop.append(self.population[idx])
 				self.population = rearranged_pop
+				self.curr_pareto_idxs = rank_idx[0]
 			elif len(indices_for_selection) >= 2:
 				''' multi objective '''
-				pass 
+				cost = np.array(self.gen_performance[-1][:,indices_for_selection])
+				pareto_idx = self.is_pareto_efficient(cost, return_mask = False)
+				rearranged_pop = []
+				for idx in pareto_idx:
+					rearranged_pop.append(self.population[idx])
+				for i in range(len(self.population)):
+					if np.sum(pareto_idx == i) == 0:
+						rearranged_pop.append(self.population[i])
+					if len(rearranged_pop) == len(self.population):
+						break
+				self.population = rearranged_pop
+				self.curr_pareto_idxs = pareto_idx
 			else:
 				quit()
 		elif selection_type == "top half":
@@ -230,13 +242,50 @@ class population():
 				for idx in top_half_idx:
 					rearranged_pop.append(self.population[idx])
 				self.population = rearranged_pop
+				self.curr_pareto_idxs = rank_idx[0]
 			elif len(indices_for_selection) >= 2:
 				''' multi objective '''
-				pass 
+				cost = np.array(self.gen_performance[-1][:,indices_for_selection])
+				pareto_idx = self.is_pareto_efficient(cost, return_mask = False)
+				rearranged_pop = []
+				for idx in pareto_idx:
+					rearranged_pop.append(self.population[idx])
+				for i in range(len(self.population)):
+					if np.sum(pareto_idx == i) == 0:
+						rearranged_pop.append(self.population[i])
+					if len(rearranged_pop) == int(len(self.population)/2):
+						break
+				self.population = rearranged_pop
+				self.curr_pareto_idxs = pareto_idx
 			else:
 				quit()		
 		else:
 			quit()
+
+	def is_pareto_efficient(self, costs, return_mask = True):
+		"""
+		Find the pareto-efficient points
+		:param costs: An (n_points, n_costs) array
+		:param return_mask: True to return a mask
+		:return: An array of indices of pareto-efficient points.
+		If return_mask is True, this will be an (n_points, ) boolean array
+		Otherwise it will be a (n_efficient_points, ) integer array of indices.
+		"""
+		is_efficient = np.arange(costs.shape[0])
+		n_points = costs.shape[0]
+		next_point_index = 0  # Next index in the is_efficient array to search for
+		while next_point_index<len(costs):
+			nondominated_point_mask = np.any(costs<costs[next_point_index], axis=1)
+			nondominated_point_mask[next_point_index] = True
+			is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
+			costs = costs[nondominated_point_mask]
+			next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
+		if return_mask:
+			is_efficient_mask = np.zeros(n_points, dtype = bool)
+			is_efficient_mask[is_efficient] = True
+			return is_efficient_mask
+		else:
+			return is_efficient
 
 	def apply_mating(self, n_partners=2, n_survivors=3):
 		if n_survivors >= len(self.population):
@@ -309,11 +358,12 @@ class population():
 			indices_for_selection=self.indices_for_selection_list
 		# setup interactive plot
 		plt.ion()
-		fig, ax = plt.subplots(3)
+		fig, ax = plt.subplots(2)
+		fig1, ax1 = plt.subplots(1)
 		# cycle variables
 		perf0=0
 		# cycle through the generations
-		for i in range(N_generations):
+		for i in range(N_generations-1):
 			print("Generation ", i+1)
 			self.test(flow, rain)
 			self.apply_selection(selection_type=selection_type, indices_for_selection=indices_for_selection)
@@ -337,23 +387,22 @@ class population():
 			ax[1].grid()
 			ax[1].set_title("Objective 2")
 			ax[1].set_xlabel("Generations")
-			ax[2].clear()
+			ax1.clear()
 			if j-1 >= 0:
-				ax[2].scatter(self.gen_performance[j-1][:,0], self.gen_performance[j-1][:,1], alpha=0.7, c="blue")
-			ax[2].scatter(self.gen_performance[j][:,0], self.gen_performance[j][:,1], alpha=0.9, c="red")
-			ax[2].grid()
+				ax1.scatter(self.gen_performance[j-1][:,0], self.gen_performance[j-1][:,1], alpha=0.4, c="blue", label="Gen. t-1")
+			ax1.scatter(self.gen_performance[j][:,0], self.gen_performance[j][:,1], alpha=0.6, c="red", label="Gen. t")
+			ax1.scatter(self.gen_performance[j][self.curr_pareto_idxs,0], self.gen_performance[j][self.curr_pareto_idxs,1], alpha=0.7, c="black", label="Pareto (Gen. t)")
+			ax1.grid()
+			ax1.set_xlabel("Objective 1")
+			ax1.set_ylabel("Objective 2")
+			ax1.legend()
 			plt.pause(0.5)
 			plt.draw()
-		
+		# Last generation needs just to be tested
+		print("Generation ", N_generations)
+		self.test(flow, rain)
+		self.apply_selection(selection_type=selection_type, indices_for_selection=indices_for_selection)
 		self.gen_performance = np.array(self.gen_performance)
-		
-		# Prot final results
-		ax[0].grid()
-		plt.ioff()
-		#fig1, ax1 = plt.subplots(1)
-		#perf = np.max(self.gen_performance[:,idx_individual,0], axis=1)  #[n_generation,idx_individual,idx_Index]
-		#plt.plot(perf)
-		plt.show()
 
 
 
@@ -365,6 +414,7 @@ class population():
 
 
 ### INDICATORS ###
+''' the lower, the better '''
 
 # Water supply for irrigation: reliability, vulnerability, resilience
 ''' w is water demand expressed as m3/s daily mean '''
@@ -390,9 +440,10 @@ def Iirr_resilience(x, w):
 	return res
 
 # Water supply for hydroelectric power
-def Ipow_Avg(power, dummy=0):
+def Ipow_Avg(power, lambda_=30):
 	''' power is not additive like i.e. water demand '''
-	return np.mean(power)
+	m = np.mean(power)
+	return np.exp(-m/lambda_)
 
 def I_pow_RMSE_from_setpoint(power, power_setpoint):
 	return np.sqrt( np.mean( (power-power_setpoint)**2 ) )
@@ -452,10 +503,10 @@ def Ienv_high_pulses(release, HP):
 	out = np.sum( release > HP ) / n_years
 	return out
 
-def Ienv_high_pulses_mean(release, HP):
+def Ienv_high_pulses_mean(release, HP, lambda_=40):
 	''' HP is the 75 percentile of the natural system '''
-	mean = np.mean( release[release> HP] )+0.001
-	return mean
+	m = np.mean( release[release> HP] )+0.001
+	return 1-np.exp(-m/lambda_)
 
 
 
