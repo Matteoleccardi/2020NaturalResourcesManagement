@@ -12,7 +12,7 @@ from NRMproject_utils3_reservoir import *
 
 # Physical data
 DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
-DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
+#DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
 data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
 year  = data[:,0]
 month = data[:,1]
@@ -86,15 +86,16 @@ A5 = reservoir(
 		initial_level = 0
 		)
 
-tested_reservoir = A5
 
 
 # EMODPS - EVOLUTIONARY MULTY OBJECTIVE DIRECT POLICY SEARCH
 
+# Model to test
+tested_reservoir = A5
 # Population data
-N_individuals=30
+N_individuals = 40
 # Total generations
-N_generations = 35
+N_generations =15
 # inputs
 N_iterations = 3
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
@@ -118,7 +119,7 @@ mutation_variance = 0.3
 
 
 pop = population(
-	base_model=A5,
+	base_model=tested_reservoir,
 	N_individuals=N_individuals,
 	mating_probability_distribution=mating_prob,
 	mutation_probability=mutation_prob,
@@ -138,6 +139,10 @@ pop.fully_evolve(
 	n_survivors=n_survivors,
 	mutation_type=mutation_type
 	)
+
+
+plt.close('all')
+pop.plot_pareto_all_generations()
 
 
 

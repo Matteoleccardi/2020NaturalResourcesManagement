@@ -4,7 +4,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import copy
 
-
+from NRMproject_plots import getRGBA, getFC
 ### RESERVOIR MODEL ###
 
 class reservoir():
@@ -78,16 +78,7 @@ class operating_policy():
 		if p is None:
 			self.uniform_shuffle_params()
 		elif len(p) == 3:
-			if p[2] >= self.h_max:
-				p[2] = self.h_max - np.random.random_sample()
-			if p[2] <= self.h_min:
-				p[2] = self.h_max - np.random.random_sample()*(self.h_max-self.h_min)/2
-			p[1] = np.max( [np.min([p[1], 1]), 0] )
-			if (p[0] <= self.h_min) or (p[0] >= self.h_max):
-				p[0] = self.h_min + np.random.random_sample()
-				while p[0] >= p[2]:
-					p[0] = self.h_min + np.random.random_sample()
-			self.p = np.array([p[0], p[1], p[2]]) 
+			self.update_params(p)
 		else:
 			print("Wrong number of parameters in operating policy.")
 			quit()
@@ -106,55 +97,79 @@ class operating_policy():
 
 	def update_params(self, p):
 		if len(p) == 3:
-			if p[2] >= self.h_max:
-				p[2] = self.h_max - np.random.random_sample()
-			if p[2] <= self.h_min:
-				p[2] = self.h_max - np.random.random_sample()*(self.h_max-self.h_min)/2
+			p[2] = np.max(
+				[np.min([p[2], self.h_max]), self.h_min+0.1]
+			)
 			p[1] = np.max( [np.min([p[1], 1]), 0] )
-			if (p[0] <= self.h_min) or (p[0] >= self.h_max):
-				p[0] = self.h_min + np.random.random_sample()
-				while p[0] >= p[2]:
-					p[0] = self.h_min + np.random.random_sample()
-			self.p = np.array([p[0], p[1], p[2]]) 
+			p[0] = np.max(
+				[np.min([p[0], p[2]]), self.h_min+0.001]
+			)
+			self.p = np.array(p)
 		else:
 			print("Wrong number of parameters while updating operating policy.")
 			quit()
 
 	def uniform_shuffle_params(self):
-		x2 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+		x2 = np.random.random_sample()*(self.h_max-self.h_min-0.1) + self.h_min+0.1
 		y  = np.random.random_sample()
-		x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
-		while x1 >= x2:
-			x1 = np.random.random_sample()*(self.h_max-self.h_min)+ self.h_min
+		x1 = np.random.random_sample()*(x2-self.h_min) + self.h_min
 		self.p = np.array([x1, y, x2])
 
 	def normal_shuffle_params(self, variance=0.3):
 		x2 = np.random.normal(self.p[2], variance*(self.h_max-self.h_min))
-		while (x2 >= self.h_max-0.1) or (x2 <= self.h_min+1):
+		while (x2 >= self.h_max) or (x2 <= self.h_min+0.1):
 			x2 = np.random.normal(self.p[2], variance*(self.h_max-self.h_min))
 		y = np.random.normal(self.p[1], variance)
-		while (y >= 1) or (y <= 0):
+		while (y > 1) or (y < 0):
 			y = np.random.normal(self.p[1], variance)
-		x1 = np.random.normal(self.p[0], variance*(self.h_max-self.h_min))
-		while (x1 >= x2) or (x1 <= self.h_min):
-			x1 = np.random.normal(self.p[0], variance*(self.h_max-self.h_min))
+		x1 = np.random.normal(np.min([self.p[0],x2]), variance*(x2-self.h_min))
+		while (x1 >= x2):
+			x1 = np.random.normal(np.min([self.p[0],x2]), variance*(x2-self.h_min))
+		x1 = np.max([x1, self.h_min+0.01])
 		self.p = np.array([x1, y, x2])
 
-	def plot_policy(color_="blue", ax=None):
-		if ax is None:
-			fig, ax = subplots()
-			ax.set_xlim([self.h_min-1, self.h_max+1])
-			ax.set_ylim([-0.1 1.1])
-			ax.grid()
-			x = [self.h_min-2, self.h_min, self.p[0], self.p[2], self.h_max, self.h_max+2]
-			y = [0, 0, self.p[1], self.p[1], 1, 1]
-			ax.plot(x, y, ".-", c=color_)
-			#############################################
+	def plot_policy(self, color_=None):
+		if color_ is None:
+			colorArray = getRGBA()
+			color_ = colorArray[19]
+		fig, ax = plt.subplots()
+		ax.set_xlim([self.h_min-5, self.h_max+5])
+		ax.set_ylim([-0.1, 1.1])
+		ax.grid()
+		x = np.array([self.h_min-10, self.h_min, self.p[0], self.p[2], self.h_max, self.h_max+10])
+		y = np.array([0, 0, self.p[1], self.p[1], 1, 1])
+		ax.plot(x, y, ".-", color=color_)
+		ax.plot([self.h_min, self.h_min],[-0.1, 1.1], "--", color=colorArray[5])
+		ax.plot([self.h_max, self.h_max],[-0.1, 1.1], "--", color=colorArray[5])
+		ax.set_xlabel("Reservoir level [m]")
+		ax.set_ylabel("Valve release [%]")
+		ax.set_title("Operating policy of the release valve")
+		ax.set_facecolor(getFC())
+		plt.show()
 
-		elif len(ax) == 1:
+	def plot_many_policies_setup(self, NumPolicies):
+		fig, ax = plt.subplots()
+		colorArray = getRGBA(NumPolicies)
+		return fig, ax, colorArray
 
+	def plot_many_policies(self, ax, plotIndex, color_array=None):
+		if color_array is None:
+			color_ = "blue"
 		else:
-			pass
+			color_ = color_array[plotIndex]
+		x = np.array([self.h_min-10, self.h_min, self.p[0], self.p[2], self.h_max, self.h_max+10])
+		y = np.array([0, 0, self.p[1], self.p[1], 1, 1])
+		ax.plot(x, y, ".-", color=color_, alpha=0.5)
+		ax.plot([self.h_min, self.h_min],[-0.1, 1.1], "--", color="orange", linewidth=0.8, alpha=0.8)
+		ax.plot([self.h_max, self.h_max],[-0.1, 1.1], "--", color="orange", linewidth=0.8, alpha=0.8)
+		ax.set_xlim([self.h_min-5, self.h_max+5])
+		ax.set_ylim([-0.1, 1.1])
+		ax.grid()
+		ax.set_xlabel("Reservoir level [m]")
+		ax.set_ylabel("Valve release [%]")
+		ax.set_title("Operating policy of the release valve")
+		ax.set_facecolor(getFC())
+			
 	
 
 
@@ -372,55 +387,86 @@ class population():
 		self.N_generations = N_generations
 		if indices_for_selection is None:
 			indices_for_selection=self.indices_for_selection_list
-		# setup interactive plot
+		# Setup interactive plot
 		plt.ion()
-		fig, ax = plt.subplots(2)
-		fig1, ax1 = plt.subplots(1)
+		fig_pol, ax_pol, col_pol = self.population[0].policy.plot_many_policies_setup(self.N_individuals)
+		fig_par, ax_par = plt.subplots(1)
 		# cycle variables
 		perf0=0
 		# cycle through the generations
-		for i in range(N_generations-1):
-			print("Generation ", i+1)
+		for g in range(self.N_generations-1):
+			print("Generation ", g+1)
 			self.test(flow, rain)
 			self.apply_selection(selection_type=selection_type, indices_for_selection=indices_for_selection)
 			self.apply_mating(n_partners=n_partners, n_survivors=n_survivors)
 			self.apply_mutation(mutation_type=mutation_type)
 			# Dynamic parameters
 			
-			# Plot
-			perf = []
-			for j in range(len(self.gen_performance)):
-				perf.append(np.min(self.gen_performance[j][:,0]))
-			ax[0].clear() 
-			ax[0].plot(np.arange(i+1)+1,perf, '.-')
-			ax[0].grid()
-			ax[0].set_title("Objective 1")
-			perf = []
-			for j in range(len(self.gen_performance)):
-				perf.append(np.min(self.gen_performance[j][:,1]))
-			ax[1].clear() 
-			ax[1].plot(np.arange(i+1)+1,perf, '.-')
-			ax[1].grid()
-			ax[1].set_title("Objective 2")
-			ax[1].set_xlabel("Generations")
-			ax1.clear()
-			if j-1 >= 0:
-				ax1.scatter(self.gen_performance[j-1][:,0], self.gen_performance[j-1][:,1], alpha=0.4, c="blue", label="Gen. t-1")
-			ax1.scatter(self.gen_performance[j][:,0], self.gen_performance[j][:,1], alpha=0.6, c="red", label="Gen. t")
-			ax1.scatter(self.gen_performance[j][self.curr_pareto_idxs,0], self.gen_performance[j][self.curr_pareto_idxs,1], alpha=0.7, c="black", label="Pareto (Gen. t)")
-			ax1.grid()
-			ax1.set_xlabel("Objective 1")
-			ax1.set_ylabel("Objective 2")
-			ax1.legend()
+			# Plot all policies of this generation
+			ax_pol.clear()
+			for i in range(self.N_individuals):
+				self.population[i].policy.plot_many_policies(ax_pol, plotIndex=i, color_array=col_pol)
+			# Plot performance index and pareto front of first 2 objectives
+			self.plot_pareto_synchronous(ax_par, g)
+			# Draw plots
 			plt.pause(0.5)
 			plt.draw()
 		# Last generation needs just to be tested
-		print("Generation ", N_generations)
+		print("Generation ", self.N_generations)
 		self.test(flow, rain)
 		self.apply_selection(selection_type=selection_type, indices_for_selection=indices_for_selection)
 		self.gen_performance = np.array(self.gen_performance)
+		# Last plots
+		plt.ioff()
 
+	def plot_pareto_synchronous(self, ax, generation_index):
+		ax.clear()
+		colArray = getRGBA()
+		if generation_index-1 >= 0:
+			ax.scatter(self.gen_performance[generation_index-1][:,0], self.gen_performance[generation_index-1][:,1], alpha=0.6, color=colArray[19], label="Gen. t-1")
+		ax.scatter(self.gen_performance[generation_index][:,0], self.gen_performance[generation_index][:,1], alpha=0.6, color=colArray[6], label="Gen. t")
+		ax.scatter(self.gen_performance[generation_index][self.curr_pareto_idxs,0], self.gen_performance[generation_index][self.curr_pareto_idxs,1], alpha=0.2, color=colArray[0], label="Pareto (Gen. t)")
+		ax.grid()
+		ax.set_xlabel("Objective 1")
+		ax.set_ylabel("Objective 2")
+		ax.set_title(f"Pareto frontier plot of generation {generation_index+1}")
+		ax.legend()
+		ax.set_facecolor(getFC())
 
+	def plot_pareto_all_generations(self):
+		plt.ion()
+		fig, ax = plt.subplots(1)
+		xmin = np.amin( self.gen_performance[:,:,0] )
+		xmax = np.amax( self.gen_performance[:,:,0] )
+		ymin = np.amin( self.gen_performance[:,:,1] )
+		ymax = np.amax( self.gen_performance[:,:,1] )
+		length = self.gen_performance.shape[0]
+		#
+		generation_index = 0
+		while generation_index < length:
+			ax.clear()
+			colArray = getRGBA()
+			if generation_index-1 >= 0:
+				ax.scatter(self.gen_performance[generation_index-1][:,0], self.gen_performance[generation_index-1][:,1], alpha=0.6, color=colArray[19], label="Gen. t-1")
+			ax.scatter(self.gen_performance[generation_index][:,0], self.gen_performance[generation_index][:,1], alpha=0.6, color=colArray[6], label="Gen. t")
+			ax.scatter(self.gen_performance[generation_index][self.curr_pareto_idxs,0], self.gen_performance[generation_index][self.curr_pareto_idxs,1], alpha=0.2, color=colArray[0], label="Pareto (Gen. t)")
+			ax.grid()
+			ax.set_xlabel("Objective 1")
+			ax.set_ylabel("Objective 2")
+			ax.set_title(f"Pareto frontier plot of generation {generation_index+1}")
+			ax.legend()
+			ax.set_facecolor(getFC())
+			ax.set_xlim([xmin, xmax])
+			ax.set_ylim([ymin, ymax])
+			plt.draw()
+			plt.pause(0.5)
+			##
+			generation_index += 1
+			if generation_index == length:
+				generation_index = 0
+		plt.ioff()
+
+		return 0
 
 
 

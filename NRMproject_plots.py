@@ -5,10 +5,11 @@ import matplotlib.pyplot as plt
 from NRMproject_utils0 import *
 from NRMproject_utils1_ANN import *
 
-def getRGBA():
+
+def getRGBA(N_steps=20):
 	# Preferred colormap
 	cmap = matplotlib.cm.get_cmap('Spectral')
-	rgba = cmap( np.arange(0,20)/20 )
+	rgba = cmap( np.arange(0,N_steps)/N_steps )
 	return rgba
 
 def getFC():
