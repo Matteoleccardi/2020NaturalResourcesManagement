@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 
 from NRMproject_utils0 import *
 from NRMproject_plots import *

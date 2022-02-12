@@ -1,7 +1,7 @@
 import numpy as np
 import scipy
 import matplotlib
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 from NRMproject_utils0 import *
 from NRMproject_utils1_ANN import *
 

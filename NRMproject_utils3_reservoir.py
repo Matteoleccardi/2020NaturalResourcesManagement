@@ -1,7 +1,7 @@
 # python3.8
 import numpy as np
 import matplotlib
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import copy
 
 
@@ -139,6 +139,22 @@ class operating_policy():
 		while (x1 >= x2) or (x1 <= self.h_min):
 			x1 = np.random.normal(self.p[0], variance*(self.h_max-self.h_min))
 		self.p = np.array([x1, y, x2])
+
+	def plot_policy(color_="blue", ax=None):
+		if ax is None:
+			fig, ax = subplots()
+			ax.set_xlim([self.h_min-1, self.h_max+1])
+			ax.set_ylim([-0.1 1.1])
+			ax.grid()
+			x = [self.h_min-2, self.h_min, self.p[0], self.p[2], self.h_max, self.h_max+2]
+			y = [0, 0, self.p[1], self.p[1], 1, 1]
+			ax.plot(x, y, ".-", c=color_)
+			#############################################
+
+		elif len(ax) == 1:
+
+		else:
+			pass
 	
 
 

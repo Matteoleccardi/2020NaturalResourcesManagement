@@ -1,7 +1,7 @@
 # python3.8
 import numpy as np
 import matplotlib
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import copy
 from scipy.stats import planck
 

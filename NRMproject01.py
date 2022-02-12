@@ -3,7 +3,7 @@ import numpy as np
 import scipy
 import scipy.stats as ss
 import matplotlib
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import torch
 
 from NRMproject_utils0 import *

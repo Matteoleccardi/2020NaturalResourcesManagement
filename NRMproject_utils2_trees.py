@@ -1,7 +1,7 @@
 import numpy as np
 import random
 import matplotlib
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor
 
 from NRMproject_utils0 import *
