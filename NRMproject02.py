@@ -12,7 +12,7 @@ from NRMproject_utils3_reservoir import *
 
 # Physical data
 DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
-#DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
+DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
 data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
 year  = data[:,0]
 month = data[:,1]
