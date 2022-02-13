@@ -179,7 +179,6 @@ class operating_policy():
 class population():
 	def __init__(self,
 		base_model,
-		mating_probability_distribution,
 		indices_list,
 		indices_params_list,
 		indices_inputs_list,
@@ -190,7 +189,6 @@ class population():
 		# define population and basic population model
 		self.base_individual = copy.deepcopy(base_model)
 		self.N_individuals = N_individuals
-		self.mating_probability_distribution = mating_probability_distribution
 		self.mutation_probability = mutation_probability
 		self.mutation_variance = mutation_variance
 		self.indices_list = indices_list
@@ -205,6 +203,21 @@ class population():
 			indiv = copy.deepcopy(self.base_individual)
 			indiv.policy.uniform_shuffle_params()
 			self.population.append( indiv )
+
+	def get_matingprob(self, len_=None):
+		if len_ == None:
+			len_ = self.N_individuals
+		if len_ > 400:
+			return 0.0025
+		elif len_ < 5:
+			return 0.999
+		else:
+			param = np.array([-1.24853343e+03,  4.54035818e+03, -6.66885475e+03, 5.06717621e+03, -2.12759604e+03,  4.92845505e+02, -6.31921546e+01,  6.37384508e+00] )
+			poly = np.poly1d(param)
+			roots = (poly - np.log(len_)).roots
+			root = np.real(roots[-1])
+			root = np.min([np.max([root, 0.0025]),0.99])
+			return root
 
 	def test(self, flow, rain):
 		performance = [] #list: performance[individual ID][Performance indices]
@@ -318,29 +331,35 @@ class population():
 		else:
 			return is_efficient
 
-	def apply_mating(self, n_partners=2, n_survivors=3):
-		if n_survivors >= len(self.population):
-			n_survivors = len(self.population)-1
+	def apply_mating(self, n_partners=2):
+		# TODO: make all the points in the pareto list survive.
+		# to these points, apply a uniform distribution
+		# to the remaining points, apply a geometric distribution
+		# n_survivors has no longer need to be a parameter
 		n_partners = np.min( [np.max([n_partners, 2]) , len(self.population)-1] )
+		n_pareto = len(self.curr_pareto_idxs)
+		p_geom = self.get_matingprob(len_=len(self.population))
+		dim = len(self.population[0].policy.p)
 		new_population = []
-		for i in range(n_survivors):
-			survivor = copy.deepcopy(self.base_individual)
-			survivor.policy.update_params(self.population[i].policy.p)
-			new_population.append( survivor )
-		for i in range(n_survivors, self.N_individuals):
-			# select parents
-			prob = self.mating_probability_distribution.rvs(size=n_partners)
-			for j in range(len(prob)):
-				prob[j] = prob[j] if (prob[j] < len(self.population)) else len(self.population)-1
+		for i in range(self.N_individuals):
+			# select n partners
+			prob = np.empty((0,))
+			for j in range(n_partners):
+				extraction = 1e09
+				while extraction >= len(self.population):
+					extraction = np.random.geometric(p=p_geom, size=1)
+					if extraction < len(self.curr_pareto_idxs):
+						extraction = np.floor( np.random.random_sample()*len(self.curr_pareto_idxs) )
+				prob = np.append(prob, int(extraction))
 			parents = []
-			for p in prob: parents.append( self.population[p] )
+			for p in prob:
+				parents.append( self.population[int(p)] )
 			# weight parents contributions
-			prob_exchange = np.random.random_sample((3,n_partners))
-			prob_exchange[0,:] /= np.sum(prob_exchange[0,:]) # normalise each parent conribution to parameter p[0]
-			prob_exchange[1,:] /= np.sum(prob_exchange[1,:]) # normalise each parent conribution to parameter p[1]
-			prob_exchange[2,:] /= np.sum(prob_exchange[2,:]) # normalise each parent conribution to parameter p[2]
+			prob_exchange = np.random.random_sample((dim,n_partners))
+			for ii in range(dim):
+				prob_exchange[ii,:] /= np.sum(prob_exchange[ii,:]) # normalise each parent conribution to parameter p[0]
 			# mate and have child
-			p_child = np.zeros(3)
+			p_child = np.zeros(dim)
 			for i in range(n_partners):
 				p_child += prob_exchange[:,i]*parents[i].policy.p
 			# save new individual
@@ -382,7 +401,6 @@ class population():
 		selection_type="top half",
 		indices_for_selection=None,
 		n_partners=2,
-		n_survivors=3,
 		mutation_type="gaussian"):
 		self.N_generations = N_generations
 		if indices_for_selection is None:
@@ -398,7 +416,7 @@ class population():
 			print("Generation ", g+1)
 			self.test(flow, rain)
 			self.apply_selection(selection_type=selection_type, indices_for_selection=indices_for_selection)
-			self.apply_mating(n_partners=n_partners, n_survivors=n_survivors)
+			self.apply_mating(n_partners=n_partners)
 			self.apply_mutation(mutation_type=mutation_type)
 			# Dynamic parameters
 			
@@ -441,7 +459,7 @@ class population():
 		ymin = np.amin( self.gen_performance[:,:,1] )
 		ymax = np.amax( self.gen_performance[:,:,1] )
 		length = self.gen_performance.shape[0]
-		#
+		# make it interactive
 		generation_index = 0
 		while generation_index < length:
 			ax.clear()

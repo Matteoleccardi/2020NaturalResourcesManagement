@@ -86,16 +86,14 @@ A5 = reservoir(
 		initial_level = 0
 		)
 
-
-
 # EMODPS - EVOLUTIONARY MULTY OBJECTIVE DIRECT POLICY SEARCH
 
 # Model to test
 tested_reservoir = A5
 # Population data
-N_individuals = 40
+N_individuals = 50
 # Total generations
-N_generations =15
+N_generations = 20
 # inputs
 N_iterations = 3
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
@@ -107,21 +105,18 @@ indices_inputs_list=["power", "release"]
 # optimization
 indices_for_selection_list = [0, 1] # first element of "indices_list"
 # selection strategy
-selection_type="top half" #"all"
-n_survivors=0 # 0 should be always fine
+selection_type="top half" #["all","top half"]
 # mating strategy
-n_partners=3
+n_partners=2
 # mutation strategy
 mutation_type="gaussian"
-mating_prob = planck(lambda_= 0.1)
-mutation_prob = 0.1
-mutation_variance = 0.3
+mutation_prob = 0.01
+mutation_variance = 0.5
 
 
 pop = population(
 	base_model=tested_reservoir,
 	N_individuals=N_individuals,
-	mating_probability_distribution=mating_prob,
 	mutation_probability=mutation_prob,
 	mutation_variance=mutation_variance,
 	indices_list=indices_list,
@@ -136,7 +131,6 @@ pop.fully_evolve(
 	rain=ext_rain,
 	selection_type=selection_type,
 	n_partners=n_partners,
-	n_survivors=n_survivors,
 	mutation_type=mutation_type
 	)
 
