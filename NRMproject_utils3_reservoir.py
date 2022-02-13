@@ -441,9 +441,9 @@ class population():
 		ax.clear()
 		colArray = getRGBA()
 		if generation_index-1 >= 0:
-			ax.scatter(self.gen_performance[generation_index-1][:,0], self.gen_performance[generation_index-1][:,1], alpha=0.6, color=colArray[19], label="Gen. t-1")
-		ax.scatter(self.gen_performance[generation_index][:,0], self.gen_performance[generation_index][:,1], alpha=0.6, color=colArray[6], label="Gen. t")
-		ax.scatter(self.gen_performance[generation_index][self.curr_pareto_idxs,0], self.gen_performance[generation_index][self.curr_pareto_idxs,1], alpha=0.2, color=colArray[0], label="Pareto (Gen. t)")
+			ax.scatter(self.gen_performance[generation_index-1][:,0], self.gen_performance[generation_index-1][:,1], alpha=0.9, color=colArray[19], label="Gen. t-1")
+		ax.scatter(self.gen_performance[generation_index][:,0], self.gen_performance[generation_index][:,1], alpha=0.9, color=colArray[6], label="Gen. t")
+		ax.scatter(self.gen_performance[generation_index][self.curr_pareto_idxs,0], self.gen_performance[generation_index][self.curr_pareto_idxs,1], alpha=0.9, color=colArray[0], label="Pareto (Gen. t)")
 		ax.grid()
 		ax.set_xlabel("Objective 1")
 		ax.set_ylabel("Objective 2")
