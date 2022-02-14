@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider, Button
 import copy
 
 from NRMproject_plots import getRGBA, getFC
@@ -197,6 +198,7 @@ class population():
 		self.indices_for_selection_list = indices_for_selection_list
 		self.gen_performance = []
 		self.N_generations=0
+		self.all_pareto_idxs = []
 		# Initialise population
 		self.population = []
 		for i in range(self.N_individuals):
@@ -301,6 +303,7 @@ class population():
 						break
 				self.population = rearranged_pop
 				self.curr_pareto_idxs = pareto_idx
+				self.all_pareto_idxs.append(pareto_idx)
 			else:
 				quit()		
 		else:
@@ -452,14 +455,46 @@ class population():
 		ax.set_facecolor(getFC())
 
 	def plot_pareto_all_generations(self):
-		plt.ion()
-		fig, ax = plt.subplots(1)
+		self.scatter_fig, self.scatter_ax = plt.subplots(1)
+		plt.subplots_adjust(bottom=0.2)
 		xmin = np.amin( self.gen_performance[:,:,0] )
 		xmax = np.amax( self.gen_performance[:,:,0] )
 		ymin = np.amin( self.gen_performance[:,:,1] )
 		ymax = np.amax( self.gen_performance[:,:,1] )
-		length = self.gen_performance.shape[0]
-		# make it interactive
+		allowed_steps = np.arange(1,self.N_generations+1)
+		ax_slider = plt.axes([0.1, 0.05, 0.85, 0.02]) # left, bottom, width, height
+		# create the sliders
+		slider_gen = Slider(
+			ax_slider, "Gen:", 1, self.N_generations,
+			valinit=self.N_generations, valstep=allowed_steps,
+			color=getRGBA()[19]
+		)
+		slider_gen.on_changed(self.update_plot_pareto_all_generations)
+		# make first scatter
+		col_t_1   = 1.0
+		col_t     = 0.2
+		col_t_par = 0.0
+		self.scatter_ax.grid()
+		self.scatter_ax.set_xlabel("Objective 1")
+		self.scatter_ax.set_ylabel("Objective 2")
+		self.scatter_ax.set_facecolor(getFC())
+		self.scatter_ax.set_xlim([xmin, xmax])
+		self.scatter_ax.set_ylim([ymin, ymax])
+		# Put data and colors
+		gen = self.N_generations
+		par_idxs = self.all_pareto_idxs[gen-1][:]
+		data = np.vstack([self.gen_performance[gen-2][:,:2],self.gen_performance[gen-1][:,:2],self.gen_performance[gen-1][par_idxs,:2]])
+		colors = np.concatenate(
+			[np.repeat(col_t_1,self.N_individuals) ,np.repeat(col_t,self.N_individuals) , np.repeat(col_t_par, len(self.all_pareto_idxs[gen-1][:]))]
+		).flatten()
+		self.scatter_ax.set_title(f"Pareto frontier plot of generation {gen-1}")
+		self.scatter = self.scatter_ax.scatter(data[:,0], data[:,1], c=colors, alpha=0.9, cmap=matplotlib.cm.get_cmap('Spectral'))
+		self.scatter_ax.set_title(f"Pareto frontier plot of generation {gen}")
+		self.scatter_fig.canvas.draw_idle()
+		plt.show()	
+		#
+		'''
+		plt.ion()
 		generation_index = 0
 		while generation_index < length:
 			ax.clear()
@@ -483,9 +518,33 @@ class population():
 			if generation_index == length:
 				generation_index = 0
 		plt.ioff()
+		'''
 
-		return 0
 
+	def update_plot_pareto_all_generations(self, gen):
+		col_t_1   = 1.0
+		col_t     = 0.2
+		col_t_par = 0.0
+		label_t_1 = "Gen. " + str(int(gen-1))
+		label_t = "Gen. " + str(int(gen))
+		label_t_par = "Pareto"
+		if gen-1 <= 0:
+			par_idxs = self.all_pareto_idxs[0][:]
+			data = np.vstack([self.gen_performance[0][:,:2],self.gen_performance[0][par_idxs,:2]])
+			colors = np.concatenate(
+				[np.repeat(col_t,self.N_individuals) , np.repeat(col_t_par, len(self.all_pareto_idxs[0][:]))]
+			).flatten()
+			self.scatter_ax.set_title(f"Pareto frontier plot of generation {1}")
+		else:
+			par_idxs = self.all_pareto_idxs[gen-1][:]
+			data = np.vstack([self.gen_performance[gen-2][:,:2],self.gen_performance[gen-1][:,:2],self.gen_performance[gen-1][par_idxs,:2]])
+			colors = np.concatenate(
+				[np.repeat(col_t_1,self.N_individuals) ,np.repeat(col_t,self.N_individuals) , np.repeat(col_t_par, len(self.all_pareto_idxs[gen-1][:]))]
+			).flatten()
+			self.scatter_ax.set_title(f"Pareto frontier plot of generation {gen-1}")
+		self.scatter.set_offsets(data)
+		self.scatter.set_array(colors)
+		self.scatter_fig.canvas.draw_idle()
 
 
 

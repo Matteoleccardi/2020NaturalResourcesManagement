@@ -11,10 +11,22 @@ from NRMproject_utils1_ANN import *
 from NRMproject_plots import *
 from NRMproject_utils2_trees import *
 
-DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
-DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
+# Get data - online or offline
+try:
+	DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
+	data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
+except Exception:
+	try:
+		DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
+		data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
+	except Exception:
+		print("ERROR: The source of the data cannot be found.")
+		print("#####  Please check your internet connection\n#####  (data gets downloaded from server),")
+		print("#####  or modify the source code and\n#####  insert the full path to data in the variable \"DATA_NAME\".")
+		print("")
+		quit()
 
-data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
+# Physical data
 year  = data[:,0]
 month = data[:,1]
 day_m = data[:,2] # day number from month start (1-30)

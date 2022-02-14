@@ -9,11 +9,22 @@ from NRMproject_utils0 import *
 from NRMproject_plots import *
 from NRMproject_utils3_reservoir import *
 
+# Get data - online or offline
+try:
+	DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
+	data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
+except Exception:
+	try:
+		DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
+		data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
+	except Exception:
+		print("ERROR: The source of the data cannot be found.")
+		print("#####  Please check your internet connection\n#####  (data gets downloaded from server),")
+		print("#####  or modify the source code and\n#####  insert the full path to data in the variable \"DATA_NAME\".")
+		print("")
+		quit()
 
 # Physical data
-DATA_NAME = "C:\\Users\\lecca\\OneDrive - Politecnico di Milano\\Natural_Resources_Management\\NRM_project_leck\\13Chatelot.csv"
-DATA_NAME = "https://raw.githubusercontent.com/Matteoleccardi/2020NaturalresourcesManagement/main/13Chatelot.csv"
-data  = np.loadtxt(DATA_NAME, delimiter=",", skiprows=1)
 year  = data[:,0]
 month = data[:,1]
 day_m = data[:,2] # day number from month start (1-30)
@@ -93,7 +104,7 @@ tested_reservoir = A5
 # Population data
 N_individuals = 50
 # Total generations
-N_generations = 20
+N_generations = 15
 # inputs
 N_iterations = 3
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
@@ -109,7 +120,7 @@ selection_type="top half" #["all","top half"]
 # mating strategy
 n_partners=2
 # mutation strategy
-mutation_type="gaussian"
+mutation_type="random"
 mutation_prob = 0.01
 mutation_variance = 0.5
 
