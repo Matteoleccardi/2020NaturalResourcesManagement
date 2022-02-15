@@ -104,11 +104,11 @@ A5 = reservoir(
 # Model to test
 tested_reservoir = A5
 # Population data
-N_individuals = 80
+N_individuals = 25
 # Total generations
-N_generations = 50
+N_generations = 10
 # inputs
-N_iterations = 3
+N_iterations = 4
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
 ext_rain = np.array([rain for i in range(N_iterations)]).flatten().copy()
 # objectives
@@ -122,20 +122,20 @@ selection_type="all" #["all","top half"]
 # mating strategy
 n_partners=2
 # mutation strategy
-mutation_prob = 0.05
-mutation_type="punctual random"
+mutation_prob = 0.1
+mutation_type="random"
 mutation_variance = 0.5
 
 
 ''' Run a simulation of the dam and plot results '''
 if 1:
 	# Flow and rain input can be modified at will
-	f = ext_flow.copy() + np.random.normal(0, 10, len(ext_flow))
-	f[f<0] = 0
+	f = ext_flow.copy()
 	r = ext_rain.copy()
 	# This simulation will leave the simulated model exactly as it was defined
-	copy.deepcopy(A5).simulate(f, r, plot=True)
-
+	dam_to_sim = copy.deepcopy(A5)
+	dam_to_sim.policy.update_params([dam_to_sim.policy.h_min+1, 0.999, dam_to_sim.policy.h_max-1])
+	dam_to_sim.simulate(f, r, plot=True)
 
 ''' Run the EMODPS algorithm '''
 pop = population(

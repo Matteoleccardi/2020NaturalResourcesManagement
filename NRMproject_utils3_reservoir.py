@@ -436,7 +436,16 @@ class population():
 		p_geom = self.get_matingprob(len_=len(self.population))
 		dim = len(self.population[0].policy.p)
 		new_population = []
-		for i in range(self.N_individuals):
+		''' make the dominant ones survive '''
+		n_always_mating = int( np.max([3, np.round(self.N_individuals*0.1)]) )
+		self.n_survivors = np.min([self.N_individuals-n_always_mating, len(self.curr_pareto_idxs)])
+		for i in range(self.n_survivors):
+			# save new dominant individual
+			new_individual = copy.deepcopy(self.base_individual)
+			new_individual.policy.update_params(self.population[i].policy.p)
+			new_population.append( new_individual )
+		''' use the remaining population slots to fill up with new offspring produced by the best individuals '''
+		for i in range(self.n_survivors,self.N_individuals):
 			# select n partners
 			prob = np.empty((0,))
 			for j in range(n_partners):
@@ -464,7 +473,8 @@ class population():
 		self.population = new_population
 
 	def apply_mutation(self, mutation_type="gaussian"):
-		for i in range(self.N_individuals):
+		''' Mutation is applied only to offspring '''
+		for i in range(self.n_survivors,self.N_individuals):
 			if np.random.random_sample() < self.mutation_probability:
 				if mutation_type == "punctual gaussian":
 					draw = int(np.round( np.random.random_sample()*3-0.5 ))
