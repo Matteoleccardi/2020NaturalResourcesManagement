@@ -155,7 +155,8 @@ pop.fully_evolve(
 	rain=ext_rain,
 	selection_type=selection_type,
 	n_partners=n_partners,
-	mutation_type=mutation_type
+	mutation_type=mutation_type,
+	saveFigures=True
 	)
 
 ''' See results of the policy evolution '''

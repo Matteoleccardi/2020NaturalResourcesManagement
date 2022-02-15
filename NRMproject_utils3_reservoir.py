@@ -496,7 +496,8 @@ class population():
 		selection_type="top half",
 		indices_for_selection=None,
 		n_partners=2,
-		mutation_type="gaussian"):
+		mutation_type="gaussian",
+		saveFigures=False):
 		self.N_generations = N_generations
 		if indices_for_selection is None:
 			indices_for_selection=self.indices_for_selection_list
@@ -525,6 +526,10 @@ class population():
 			# Draw plots
 			plt.pause(0.5)
 			plt.draw()
+			# Save figures
+			if saveFigures:
+				fig_par.savefig(f"./pareto_{g:04}.jpeg", bbox_inches="tight", dpi=150)
+				fig_pol.savefig(f"./policies_{g:04}.jpeg", bbox_inches="tight", dpi=150)
 		# Last generation needs just to be tested
 		print("Last generation ", self.N_generations)
 		self.test(flow, rain)
@@ -544,7 +549,7 @@ class population():
 		ax.grid()
 		ax.set_xlabel("Objective 1")
 		ax.set_ylabel("Objective 2")
-		ax.set_title(f"Pareto frontier plot of generation {generation_index+1}")
+		ax.set_title(f"Pareto frontier plot of generation {generation_index+1} of {self.N_generations}")
 		ax.legend()
 		ax.set_facecolor(getFC())
 
