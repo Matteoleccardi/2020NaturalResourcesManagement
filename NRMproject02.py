@@ -108,7 +108,7 @@ N_individuals = 80
 # Total generations
 N_generations = 50
 # inputs
-N_iterations = 4
+N_iterations = 3
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
 ext_rain = np.array([rain for i in range(N_iterations)]).flatten().copy()
 # objectives
@@ -118,12 +118,12 @@ indices_inputs_list=["power", "release"]
 # optimization
 indices_for_selection_list = [0, 1] # element of "indices_list" to consider in selection algorithm
 # selection strategy
-selection_type="top half" #["all","top half"]
+selection_type="all" #["all","top half"]
 # mating strategy
 n_partners=2
 # mutation strategy
 mutation_prob = 0.05
-mutation_type="random"
+mutation_type="punctual random"
 mutation_variance = 0.5
 
 

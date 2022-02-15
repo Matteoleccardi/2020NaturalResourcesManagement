@@ -399,11 +399,11 @@ class population():
 						break
 				self.population = rearranged_pop
 				self.curr_pareto_idxs = pareto_idx
-				self.all_pareto_idxs.append(pareto_idx)
 			else:
 				quit()		
 		else:
 			quit()
+		self.all_pareto_idxs.append(self.curr_pareto_idxs)
 
 	def is_pareto_efficient(self, costs, return_mask = True):
 		"""
@@ -431,10 +431,6 @@ class population():
 			return is_efficient
 
 	def apply_mating(self, n_partners=2):
-		# TODO: make all the points in the pareto list survive.
-		# to these points, apply a uniform distribution
-		# to the remaining points, apply a geometric distribution
-		# n_survivors has no longer need to be a parameter
 		n_partners = np.min( [np.max([n_partners, 2]) , len(self.population)-1] )
 		n_pareto = len(self.curr_pareto_idxs)
 		p_geom = self.get_matingprob(len_=len(self.population))
