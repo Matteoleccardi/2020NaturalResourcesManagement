@@ -7,4 +7,4 @@ NRMproject02.py contains different alternatives regarding the construction of a 
 The optimization procedure could be considered as a kind of Evolutionary Mult-Objective Direct Policy Search (EMODPS), however no particular already-existing algorithm is used, rather I preferred to build a simple version from scratch myself.
 
 ## Requirements
-python3.8 or higher, numpy, matplotlib, scipy, pytorch, cuda is advisable.
+python3.8 or higher, numpy, matplotlib, scipy, pytorch, cuda is advisable, sklearn.
