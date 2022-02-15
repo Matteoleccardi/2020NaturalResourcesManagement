@@ -545,6 +545,20 @@ class population():
 		self.test(flow, rain)
 		self.apply_selection(selection_type=selection_type, indices_for_selection=indices_for_selection)
 		self.gen_performance = np.array(self.gen_performance)
+		# Plot all policies of this generation
+		ax_pol.clear()
+		for i in range(self.N_individuals):
+			self.population[i].policy.plot_many_policies(ax_pol, plotIndex=i, color_array=col_pol, pareto_indices=self.curr_pareto_idxs, tot_policies=self.N_individuals)
+		ax_pol.set_title(f"Operating policy of the release valve (Gen {self.N_generations})")
+		# Plot performance index and pareto front of first 2 objectives
+		self.plot_pareto_synchronous(ax_par, self.N_generations)
+		# Draw plots
+		plt.pause(0.5)
+		plt.draw()
+		# Save figures
+		if saveFigures:
+			fig_par.savefig(f"./pareto_{self.N_generations:04}.jpeg", bbox_inches="tight", dpi=150)
+			fig_pol.savefig(f"./policies_{self.N_generations:04}.jpeg", bbox_inches="tight", dpi=150)
 		# Last plot and messages
 		plt.ioff()
 		print("Evolutionary training completed.")
@@ -644,79 +658,67 @@ class population():
 
 
 ### INDICATORS ###
-''' the lower, the better '''
+''' the lower, the better the performance'''
 
 # Water supply for irrigation: reliability, vulnerability, resilience
 ''' w is water demand expressed as m3/s daily mean '''
 def Iirr_reliability(x, w):
 	out = np.sum( x >= w ) / len(x)
-	return np.exp(-out)
-def Iirr_vulnerability(x, w, power=1):
+	return 0-out
+def Iirr_vulnerability(x, w, risk_aversion=1):
 	y = w - x
 	y[y<0] = 0
-	num = np.sum( y ) ** power
+	num = np.sum( y ) ** risk_aversion
 	den = np.sum( x < w )
-	if den == 0:
-		res = 0
-	else:
-		res = num / den
-	return 1-np.exp(res)
+	res = 0 if den == 0 else num / den
+	return res
 def Iirr_resilience(x, w):
 	den = x[:-1] < w
 	num = np.sum( den and (x[1:] >= w) )
 	den = np.sum(x[:-1] < w)
-	if den == 0:
-		res = 1
-	else:
-		res = num / den
-	return 1-res
+	res = 1 if den == 0 else num / den
+	return 0-res
 
 # Water supply for hydroelectric power
-def Ipow_Avg(power, lambda_=30):
+def Ipow_Avg(power, target_power=0):
 	''' power is not additive like i.e. water demand '''
 	m = np.mean(power)
-	return np.exp(-m/lambda_)
+	return target_power-m
 def I_pow_RMSE_from_setpoint(power, power_setpoint):
 	return np.sqrt( np.mean( (power-power_setpoint)**2 ) )
 def Ipow_reliability(power, pow_demand):
 	out = np.sum( power >= pow_demand ) / len(power)
-	return np.exp(-out)
+	return 0-out
 def Ipow_vulnerability(power, pow_demand, risk_aversion=1):
 	num = np.sum( np.max(pow_demand - power, 0) ) ** risk_aversion
 	den = np.sum( power < pow_demand )
-	if den == 0:
-		res = 0
-	else:
-		res = num / den
-	return 1-np.exp(res)
+	res = 0 if den == 0 else num / den
+	return res
 def Ipow_resilience(power, pow_demand):
 	den = power[:-1] < pow_demand
 	num = np.sum( den and (power[1:] >= pow_demand) )
 	den = np.sum(power[:-1] < pow_demand)
-	if den == 0:
-		res = 1
-	else:
-		res = num / den
-	return 1-res
+	res = 1 if den == 0 else num / den
+	return 0-res
 
 # Flooding indicators
 ''' h_max is the flood threshold '''
 def Iflood_yearly_avg(h, hmax):
 	n_years = len(h)/365
 	out = np.sum( h >= hmax ) / n_years
-	return 1-np.exp(-out)
+	return out
 
 def Iflood_max_area(h, hmax):
 	steepness = 0.087 # steepness of 5 degrees
 	x = (h-hmax)/steepness
 	x_max = np.max([x, 0])
-	return 1-np.exp(-x_max)
+	return x_max
 
 def Iflood_kayakClub(h, h_active_storage):
 	h_club = h_active_storage + 3 # m
 	n_years = len(h)/365
-	out = np.sum( h >= h_active_storage ) / n_years
-	return 1-np.exp(-out)
+	out = np.sum( h >= h_club ) / n_years
+	return out
 
 # Environmental indicators
 def Ienv_low_pulses(release, LP):
@@ -730,14 +732,18 @@ def Ienv_high_pulses(release, HP):
 	out = np.sum( release > HP ) / n_years
 	return out
 ''' For the optimization algorithm, use these two as environmental indicators, not the two above '''
-def Ienv_low_pulses_mean(release, LP, lambda_=40):
+def Ienv_low_pulses_mean(release, LP):
 	''' HP is the 75 percentile of the natural system '''
+	if np.sum(release < LP) == 0:
+		return 0-LP
 	m = np.mean( release[release < LP] )
-	return 1-np.exp(-m/lambda_)
-def Ienv_high_pulses_mean(release, HP, lambda_=40):
+	return 0-m
+def Ienv_high_pulses_mean(release, HP):
 	''' HP is the 75 percentile of the natural system '''
+	if np.sum(release > HP) == 0:
+		return 0
 	m = np.mean( release[release > HP] )
-	return 1-np.exp(-m/lambda_)
+	return m
 
 
 

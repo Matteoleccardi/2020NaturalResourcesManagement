@@ -104,16 +104,16 @@ A5 = reservoir(
 # Model to test
 tested_reservoir = A5
 # Population data
-N_individuals = 25
+N_individuals = 90
 # Total generations
-N_generations = 10
+N_generations = 70
 # inputs
 N_iterations = 4
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
 ext_rain = np.array([rain for i in range(N_iterations)]).flatten().copy()
 # objectives
 indices_list=[Ipow_Avg, Ienv_high_pulses_mean]
-indices_params_list=[30, perc_75]
+indices_params_list=[40, perc_75]
 indices_inputs_list=["power", "release"]
 # optimization
 indices_for_selection_list = [0, 1] # element of "indices_list" to consider in selection algorithm
@@ -123,7 +123,7 @@ selection_type="all" #["all","top half"]
 n_partners=2
 # mutation strategy
 mutation_prob = 0.1
-mutation_type="random"
+mutation_type="punctual random"
 mutation_variance = 0.5
 
 
