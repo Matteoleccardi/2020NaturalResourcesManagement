@@ -37,6 +37,7 @@ class reservoir():
 		self.update_valve()
 		# Utilities
 		self.days_to_seconds = 24*60*60
+		self.performance = 0
 		# Operating policy related to the reservoir
 		self.policy = operating_policy(self.h_max_flood, self.h_min, p=policy_params)
 
@@ -346,6 +347,7 @@ class population():
 				perform = self.indices_list[i](inp, par)
 				perf_list_temp.append( perform )
 			performance.append(perf_list_temp)
+			self.population[n].performance = np.array(perf_list_temp).copy()
 		self.gen_performance.append( np.array(performance) ) #[n_generation][idx_individual,idx_Index]
 
 	def apply_selection(self, selection_type="top half", indices_for_selection=[0]):
@@ -472,9 +474,47 @@ class population():
 			new_population.append( new_individual )
 		self.population = new_population
 
+	def get_5nn_mean_distance_dominance_set(self, n):
+		if len(self.curr_pareto_idxs) > 5:
+			dist = []
+			for i in range(len(self.curr_pareto_idxs)):
+				if i == n:
+					d=0
+				else:
+					d = np.linalg.norm(self.population[n].performance-self.population[i].performance)
+					dist.append(d)
+			dist = np.sort(np.array(dist))[::-1] # descending order
+			return np.mean(dist[:5])
+		else:
+			return 0
+
+	def get_mutation_indices(self):
+		self.mutation_indices = np.arange(self.n_survivors,self.N_individuals)
+		if len(self.curr_pareto_idxs) < self.N_individuals*0.8:
+			return 0
+		# for each individual compute the mean distance of the 5 nearest neighbours is the dominant set
+		m = []
+		for n in range(len(self.curr_pareto_idxs)):
+			m.append( self.get_5nn_mean_distance_dominance_set(n) )
+		m = np.array(m)
+		# get the threshold: top densest 10%
+		m_thr = np.percentile(m, 90)
+		# get indices
+		m = m-m_thr
+		m[m<0] = 0
+		if np.sum(m) == 0:
+			pass
+		else:
+			num_exceeding_thr = np.sum(m>0)
+			if num_exceeding_thr <= 0:
+				pass
+			else:
+				positions = np.argsort()[-num_exceeding_thr:]
+				self.mutation_indices = np.append(self.mutation_indices, positions)
+
 	def apply_mutation(self, mutation_type="gaussian"):
-		''' Mutation is applied only to offspring '''
-		for i in range(self.n_survivors,self.N_individuals):
+		self.get_mutation_indices()
+		for i in self.mutation_indices:
 			if np.random.random_sample() < self.mutation_probability:
 				if mutation_type == "punctual gaussian":
 					draw = int(np.round( np.random.random_sample()*3-0.5 ))
@@ -567,9 +607,9 @@ class population():
 		ax.clear()
 		colArray = getRGBA()
 		if generation_index-1 >= 0:
-			ax.scatter(self.gen_performance[generation_index-1][:,0], self.gen_performance[generation_index-1][:,1], alpha=0.9, color=colArray[19], label="Gen. t-1")
-		ax.scatter(self.gen_performance[generation_index][:,0], self.gen_performance[generation_index][:,1], alpha=0.9, color=colArray[6], label="Gen. t")
-		ax.scatter(self.gen_performance[generation_index][self.curr_pareto_idxs,0], self.gen_performance[generation_index][self.curr_pareto_idxs,1], alpha=0.9, color=colArray[0], label="Pareto (Gen. t)")
+			ax.scatter(self.gen_performance[-2][:,0], self.gen_performance[-2][:,1], alpha=0.9, color=colArray[19], label="Gen. t-1")
+		ax.scatter(self.gen_performance[-1][:,0], self.gen_performance[-1][:,1], alpha=0.9, color=colArray[6], label="Gen. t")
+		ax.scatter(self.gen_performance[-1][self.curr_pareto_idxs,0], self.gen_performance[-1][self.curr_pareto_idxs,1], alpha=0.9, color=colArray[0], label="Pareto (Gen. t)")
 		ax.grid()
 		ax.set_xlabel("Objective 1")
 		ax.set_ylabel("Objective 2")

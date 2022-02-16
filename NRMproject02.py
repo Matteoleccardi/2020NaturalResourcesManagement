@@ -104,9 +104,9 @@ A5 = reservoir(
 # Model to test
 tested_reservoir = A5
 # Population data
-N_individuals = 90
+N_individuals = 120
 # Total generations
-N_generations = 70
+N_generations = 50
 # inputs
 N_iterations = 4
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
@@ -122,8 +122,8 @@ selection_type="all" #["all","top half"]
 # mating strategy
 n_partners=2
 # mutation strategy
-mutation_prob = 0.1
-mutation_type="punctual random"
+mutation_prob = 0.3
+mutation_type="random"
 mutation_variance = 0.5
 
 
@@ -156,7 +156,7 @@ pop.fully_evolve(
 	selection_type=selection_type,
 	n_partners=n_partners,
 	mutation_type=mutation_type,
-	saveFigures=False
+	saveFigures=True
 	)
 
 ''' See results of the policy evolution '''
