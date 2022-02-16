@@ -499,18 +499,13 @@ class population():
 			m.append( self.get_5nn_mean_distance_dominance_set(n) )
 		m = np.array(m)
 		# get the threshold
-		m_thr = np.percentile(m, 75)
+		m_thr = np.percentile(m, 25)
 		# get indices
-		m[m<m_thr] = 0
-		if np.sum(m) == 0:
-			a=0
-		else:
-			num_exceeding_thr = np.sum(m>0)
-			if num_exceeding_thr <= 0:
-				a=0
-			else:
-				positions = np.argsort(m)[-num_exceeding_thr:]
-				self.mutation_indices = np.append(self.mutation_indices, positions)
+		m[m>m_thr] = 1e20
+		num_under_thr = np.sum(m<1e19)
+		if not (num_under_thr == 0):
+			positions = np.argsort(m)[:num_under_thr]
+			self.mutation_indices = np.append(self.mutation_indices, positions)
 
 	def apply_mutation(self, mutation_type="gaussian"):
 		self.get_mutation_indices()
