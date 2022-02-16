@@ -445,6 +445,7 @@ class population():
 			# save new dominant individual
 			new_individual = copy.deepcopy(self.base_individual)
 			new_individual.policy.update_params(self.population[i].policy.p)
+			new_individual.performance = self.population[i].performance.copy()
 			new_population.append( new_individual )
 		''' use the remaining population slots to fill up with new offspring produced by the best individuals '''
 		for i in range(self.n_survivors,self.N_individuals):
@@ -484,32 +485,31 @@ class population():
 					d = np.linalg.norm(self.population[n].performance-self.population[i].performance)
 					dist.append(d)
 			dist = np.sort(np.array(dist))[::-1] # descending order
-			return np.mean(dist[:5])
+			return np.median(dist[:5])
 		else:
 			return 0
 
 	def get_mutation_indices(self):
 		self.mutation_indices = np.arange(self.n_survivors,self.N_individuals)
-		if len(self.curr_pareto_idxs) < self.N_individuals*0.8:
+		if len(self.curr_pareto_idxs) < self.N_individuals*0.85:
 			return 0
 		# for each individual compute the mean distance of the 5 nearest neighbours is the dominant set
 		m = []
 		for n in range(len(self.curr_pareto_idxs)):
 			m.append( self.get_5nn_mean_distance_dominance_set(n) )
 		m = np.array(m)
-		# get the threshold: top densest 10%
-		m_thr = np.percentile(m, 90)
+		# get the threshold
+		m_thr = np.percentile(m, 75)
 		# get indices
-		m = m-m_thr
-		m[m<0] = 0
+		m[m<m_thr] = 0
 		if np.sum(m) == 0:
-			pass
+			a=0
 		else:
 			num_exceeding_thr = np.sum(m>0)
 			if num_exceeding_thr <= 0:
-				pass
+				a=0
 			else:
-				positions = np.argsort()[-num_exceeding_thr:]
+				positions = np.argsort(m)[-num_exceeding_thr:]
 				self.mutation_indices = np.append(self.mutation_indices, positions)
 
 	def apply_mutation(self, mutation_type="gaussian"):

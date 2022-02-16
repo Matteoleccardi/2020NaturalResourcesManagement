@@ -118,7 +118,7 @@ indices_inputs_list=["power", "release"]
 # optimization
 indices_for_selection_list = [0, 1] # element of "indices_list" to consider in selection algorithm
 # selection strategy
-selection_type="all" #["all","top half"]
+selection_type="all" # "all" is the best one. Others: ["all","top half"]
 # mating strategy
 n_partners=2
 # mutation strategy
