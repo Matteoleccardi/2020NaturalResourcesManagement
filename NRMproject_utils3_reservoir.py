@@ -491,7 +491,7 @@ class population():
 
 	def get_mutation_indices(self):
 		self.mutation_indices = np.arange(self.n_survivors,self.N_individuals)
-		if len(self.curr_pareto_idxs) < self.N_individuals*0.85:
+		if len(self.curr_pareto_idxs) < self.N_individuals*0.80:
 			return 0
 		# for each individual compute the mean distance of the 5 nearest neighbours is the dominant set
 		m = []
@@ -499,7 +499,7 @@ class population():
 			m.append( self.get_5nn_mean_distance_dominance_set(n) )
 		m = np.array(m)
 		# get the threshold
-		m_thr = np.percentile(m, 25)
+		m_thr = np.percentile(m, 50)
 		# get indices
 		m[m>m_thr] = 1e20
 		num_under_thr = np.sum(m<1e19)

@@ -108,7 +108,7 @@ N_individuals = 120
 # Total generations
 N_generations = 50
 # inputs
-N_iterations = 4
+N_iterations = 3
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
 ext_rain = np.array([rain for i in range(N_iterations)]).flatten().copy()
 # objectives
