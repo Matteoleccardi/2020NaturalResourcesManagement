@@ -475,7 +475,7 @@ class population():
 			new_population.append( new_individual )
 		self.population = new_population
 
-	def get_5nn_mean_distance_dominance_set(self, n):
+	def get_nnn_closest_max_distance_dominance_set(self, n, Num=2):
 		if len(self.curr_pareto_idxs) > 5:
 			dist = []
 			for i in range(len(self.curr_pareto_idxs)):
@@ -484,22 +484,27 @@ class population():
 				else:
 					d = np.linalg.norm(self.population[n].performance-self.population[i].performance)
 					dist.append(d)
-			dist = np.sort(np.array(dist))[::-1] # descending order
-			return np.median(dist[:5])
+			dist = np.sort(np.array(dist))
+			return dist[Num]
 		else:
 			return 0
 
 	def get_mutation_indices(self):
 		self.mutation_indices = np.arange(self.n_survivors,self.N_individuals)
 		if len(self.curr_pareto_idxs) < self.N_individuals*0.80:
+			''' the dominant set is too little, wait until it becomes crowded '''
 			return 0
 		# for each individual compute the mean distance of the 5 nearest neighbours is the dominant set
 		m = []
 		for n in range(len(self.curr_pareto_idxs)):
-			m.append( self.get_5nn_mean_distance_dominance_set(n) )
+			m.append( self.get_nnn_closest_max_distance_dominance_set(n, Num=3) )
 		m = np.array(m)
+		# Uniformity detection
+		if (np.max(m)-np.min(m))/2 < 1.2*np.median(m):
+			''' the distribution of distances is uniform enough '''
+			return 0
 		# get the threshold
-		m_thr = np.percentile(m, 50)
+		m_thr = np.percentile(m, 35)
 		# get indices
 		m[m>m_thr] = 1e20
 		num_under_thr = np.sum(m<1e19)
@@ -569,7 +574,7 @@ class population():
 			# Plot performance index and pareto front of first 2 objectives
 			self.plot_pareto_synchronous(ax_par, g)
 			# Draw plots
-			plt.pause(0.5)
+			plt.pause(5)
 			plt.draw()
 			# Save figures
 			if saveFigures:

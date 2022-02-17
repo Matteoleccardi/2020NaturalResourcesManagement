@@ -104,11 +104,11 @@ A5 = reservoir(
 # Model to test
 tested_reservoir = A5
 # Population data
-N_individuals = 120
+N_individuals = 100
 # Total generations
 N_generations = 50
 # inputs
-N_iterations = 3
+N_iterations = 4
 ext_flow = np.array([flow for i in range(N_iterations)]).flatten().copy()
 ext_rain = np.array([rain for i in range(N_iterations)]).flatten().copy()
 # objectives
@@ -122,7 +122,7 @@ selection_type="all" # "all" is the best one. Others: ["all","top half"]
 # mating strategy
 n_partners=2
 # mutation strategy
-mutation_prob = 0.3
+mutation_prob = 0.4
 mutation_type="random"
 mutation_variance = 0.5
 
